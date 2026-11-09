@@ -1,0 +1,6 @@
+starlette==1.10.0
+uvicorn==0.54.0
+# Tests only:
+httpx==0.28.1
+# Runtime also requires the pinned physics-worksheet-mcp 0.1.2 installation;
+# see README.md. It is reused read-only, with independent service state.

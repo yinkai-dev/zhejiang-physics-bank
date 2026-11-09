@@ -1,0 +1,12 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {parseFilters,filterQuestions,addSelection,moveSelection,selectionIssues} from '../src/domain.mjs';
+const catalog=JSON.parse(fs.readFileSync('public/data/catalog.json','utf8'));
+const index=JSON.parse(fs.readFileSync('public/data/questions-index.json','utf8')).questions;
+const papers=new Map(catalog.papers.map(p=>[p.paper_id,p]));
+const filter=query=>filterQuestions(index,papers,parseFilters(new URLSearchParams(query)),new URLSearchParams(query).get('q')||'');
+test('all three real banks and separate target/actual years',()=>{assert.equal(filter('').length,666);assert.equal(filter('year=2025').length,198);assert.equal(filter('year=2026').length,378);assert.equal(filter('year=2027&session=first&examYear=2026').length,90);assert.equal(filter('examYear=2027').length,0);assert.equal(filter('kind=official').length,0);assert.equal(filter('year=2027&session=second').length,0);});
+test('same dimension union, cross dimension intersection, unique topics',()=>{assert.equal(filter('year=2025&year=2027').length,288);assert.equal(filter('session=second').length,576);const qs=filter('topic=光学&topic=近代物理');assert.equal(qs.length,new Set(qs.map(q=>q.id)).size);const intersection=filter('topic=光学&type=实验题&year=2026');assert(intersection.every(q=>q.topics.includes('光学')&&q.type==='实验题'&&papers.get(q.paper_id).target_year===2026));});
+test('answer states and keyword matching use actual data',()=>{assert.equal(filter('answer=source').length,463);assert.equal(filter('answer=missing').length,5);assert.equal(filter('answer=not_ingested').length,198);assert.equal(filter('q=Z20&year=2027').length,18);assert(filter('q=绝不匹配的虚构题库关键词').length===0);});
+test('cross-paper selection deduplication, ordering and source drift',()=>{let rows=[];const a=index[0],b=index.at(-1);rows=addSelection(rows,a);rows=addSelection(rows,b);rows=addSelection(rows,a);assert.equal(rows.length,2);rows=moveSelection(rows,b.id,-1);assert.equal(rows[0].id,b.id);assert.deepEqual(selectionIssues(rows,index),[]);assert.equal(selectionIssues([{id:a.id,fingerprint:'old'}],index)[0].reason,'changed');assert.equal(selectionIssues([{id:'removed',fingerprint:'old'}],index)[0].reason,'removed');});

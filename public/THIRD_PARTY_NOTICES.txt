@@ -1,0 +1,14 @@
+第三方依赖与内容说明
+
+MathJax 3.2.2 — Apache License 2.0
+Copyright (c) 2009-2022 The MathJax Consortium
+License bundled at vendor/mathjax/LICENSE
+https://github.com/mathjax/MathJax
+
+Vite — MIT; TypeScript — Apache-2.0; @types/node — MIT
+These are build tools; their full notices remain in the locked npm packages.
+
+网站界面与工具为本项目独立实现。未复制 Wasio 源码。
+试卷题文、配图与来源答案的权利属于相应权利人。
+网站代码的公开不授予题目内容的再许可。内容问题请在项目仓库反馈：
+https://github.com/yinkai-dev/zhejiang-physics-bank/issues

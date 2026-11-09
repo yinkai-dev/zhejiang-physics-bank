@@ -1,0 +1,35 @@
+[Unit]
+Description=Zhejiang public physics PDF service
+After=network.target
+
+[Service]
+Type=simple
+User=zjpdf
+Group=zjpdf
+WorkingDirectory=/opt/zjpdf/current/pdf-service
+Environment=ZJPDF_DATA=/opt/zjpdf/current/public/data
+Environment=ZJPDF_STATE=/var/lib/zjpdf
+Environment=ZJPDF_BANKS=/srv/pwmcp/banks
+Environment=ZJPDF_ORIGINS=https://yinkai-dev.github.io
+Environment=OPENBLAS_NUM_THREADS=1
+ExecStart=/opt/pwmcp/envs/v0.1.2-6910da0/bin/python -m uvicorn app:application --factory --host 127.0.0.1 --port 8781 --no-access-log --no-proxy-headers
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/zjpdf
+InaccessiblePaths=/srv/pwmcp/banks/qiangji /var/lib/pwmcp /etc/pwmcp
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=700M
+CPUQuota=80%
+TasksMax=64
+Nice=10
+TimeoutStopSec=15
+KillMode=control-group
+
+[Install]
+WantedBy=multi-user.target

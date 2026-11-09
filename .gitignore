@@ -24,6 +24,4 @@ test-results/
 .DS_Store
 Thumbs.db
 
-# Publish only an explicit, validated static export in a later implementation step
-/public/data/
-/public/images/
+# Public data/images contain only the checked whitelist projection.

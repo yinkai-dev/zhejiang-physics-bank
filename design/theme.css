@@ -1,0 +1,3 @@
+/* 原生 CSS 主题入口；项目未使用 Tailwind。 */
+@import './tokens.css';
+:root { color-scheme: light; }

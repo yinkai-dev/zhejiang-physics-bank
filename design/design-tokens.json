@@ -1,0 +1,141 @@
+{
+  "$meta": {
+    "name": "浙江物理题库"
+  },
+  "primitive": {
+    "color": {
+      "primary": {
+        "100": "#ebffff",
+        "200": "#a9ecea",
+        "300": "#74ccc7",
+        "400": "#46a69f",
+        "500": "#24736b",
+        "600": "#206c5f",
+        "700": "#1c6554",
+        "800": "#185e49",
+        "900": "#14573f"
+      },
+      "neutral": {
+        "50": "#fffffa",
+        "100": "#fdfdf6",
+        "200": "#e4e2d3",
+        "300": "#c8c3b1",
+        "400": "#aca391",
+        "500": "#8f8270",
+        "600": "#796a5c",
+        "700": "#625349",
+        "800": "#4c3c35",
+        "900": "#352722",
+        "950": "#1f1411"
+      },
+      "base": {
+        "white": "#ffffff"
+      }
+    },
+    "text": {
+      "12": "12px",
+      "14": "14px",
+      "16": "16px",
+      "18": "18px",
+      "20": "20px",
+      "24": "24px",
+      "30": "30px",
+      "36": "36px",
+      "48": "48px"
+    },
+    "space": {
+      "4": "4px",
+      "8": "8px",
+      "12": "12px",
+      "16": "16px",
+      "24": "24px",
+      "32": "32px",
+      "48": "48px",
+      "64": "64px",
+      "96": "96px",
+      "128": "128px"
+    },
+    "weight": {
+      "normal": 400,
+      "strong": 600
+    },
+    "leading": {
+      "tight": 1.25,
+      "normal": 1.5,
+      "reading": 2
+    }
+  },
+  "semantic": {
+    "color": {
+      "canvas": "{color.neutral.100}",
+      "surface": "{color.base.white}",
+      "ink": "{color.neutral.950}",
+      "muted": "{color.neutral.700}",
+      "action": "{color.primary.500}",
+      "action-hover": "{color.primary.700}",
+      "on-action": "{color.base.white}",
+      "tint": "{color.primary.100}",
+      "border": "{color.neutral.200}",
+      "border-strong": "{color.neutral.300}"
+    },
+    "radius": {
+      "control": "6px",
+      "panel": "8px"
+    },
+    "shadow": {
+      "small": "0 1px 3px hsla(0,0%,0%,.12)"
+    }
+  },
+  "pairs": [
+    {
+      "name": "normal text",
+      "fg": "#1f1411",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "normal text",
+      "fg": "#625349",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "normal text",
+      "fg": "#24736b",
+      "bg": "#ffffff"
+    },
+    {
+      "name": "normal text",
+      "fg": "#1f1411",
+      "bg": "#fdfdf6"
+    },
+    {
+      "name": "normal text",
+      "fg": "#625349",
+      "bg": "#fdfdf6"
+    },
+    {
+      "name": "normal text",
+      "fg": "#24736b",
+      "bg": "#fdfdf6"
+    },
+    {
+      "name": "primary",
+      "fg": "#ffffff",
+      "bg": "#24736b"
+    },
+    {
+      "name": "hover",
+      "fg": "#ffffff",
+      "bg": "#1c6554"
+    },
+    {
+      "name": "badge",
+      "fg": "#24736b",
+      "bg": "#ebffff"
+    },
+    {
+      "name": "toast",
+      "fg": "#ffffff",
+      "bg": "#1f1411"
+    }
+  ]
+}
