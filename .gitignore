@@ -1,0 +1,29 @@
+# Local source packages, credentials, evidence and runtime state
+/.local/
+/private/
+/原始资料/
+/output/
+/logs/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Build products and environments
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+playwright-report/
+test-results/
+.DS_Store
+Thumbs.db
+
+# Publish only an explicit, validated static export in a later implementation step
+/public/data/
+/public/images/
