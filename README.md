@@ -12,6 +12,8 @@
 
 2026-11-09：首版已发布到 GitHub Pages，37 卷 666 题全量接入。支持组合筛选、关键词搜索、试卷和单题链接、已有原卷答案、跨卷练习清单、XeLaTeX PDF 生成与浏览器打印。[首次构建与部署记录](https://github.com/yinkai-dev/zhejiang-physics-bank/actions/runs/42630357774)全部通过。
 
+2026-11-10：仓库可见性切换后 Pages 被关闭，现已重新启用 GitHub Actions 发布并完成[恢复部署](https://github.com/yinkai-dev/zhejiang-physics-bank/actions/runs/42762462263)。原网址恢复 HTTP 200，52 项线上页面与资源检查通过，PDF 服务健康检查正常。
+
 | 入口 | 内容 |
 | --- | --- |
 | [实施方案](docs/实施方案.md) | 首版范围、页面、技术路线、后续迭代 |
@@ -48,6 +50,8 @@ npm run preview -- --port 4173
 开发和预览入口均使用 `/zhejiang-physics-bank/` 子路径。公式渲染器随站点发布，不依赖外部 CDN。
 
 更新题库时，先准备并校验 `.local/banks/active.json` 指向的来源，维护 `metadata/paper-catalog.json`，然后运行 `npm run export`、测试与生产构建。导出器检查全部来源文件哈希、题目指纹、答案指纹和引用图片；任何不一致会中止。PDF 服务部署需同步更新公开目录和冻结 release，见 [PDF 接口说明](pdf-service/README.md)。公开导出物提交后，main 的网站变更经 Actions 校验并部署 `dist/`；纯文档更新不触发重新部署。当前导出器固定首批 37 卷／666 题，扩大来源范围需显式调整数据验收合同。
+
+若仓库切换公开／私密后网站出现 404，先在 Settings → Pages 确认站点已启用，发布方式选择 GitHub Actions，再到 Actions → Build and deploy Pages → Run workflow，选择 main 重新部署。免费账户把公开仓库改为私密会使 Pages 自动下线，改回公开后仍需检查发布设置并重新部署，见 [GitHub 可见性说明](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)。
 
 ## 验证与已知问题
 
