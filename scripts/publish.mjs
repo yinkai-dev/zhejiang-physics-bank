@@ -18,6 +18,7 @@ import { readJson, writeJson, sha, verifyReleaseTree, parseArgs, loadConfig } fr
 import { diffPublic, describeDiff, diffSummary, loadPublicDir, loadPublicGit, totals } from './lib/diff.mjs';
 import { Remote, buildBlob, blobSpec, fileEntry, pendingChunks } from './lib/remote.mjs';
 import { classifyStatus } from './lib/gitstate.mjs';
+import { request, describeError } from './lib/http.mjs';
 
 const DEFAULTS = {
   site_url: 'https://yinkai-dev.github.io/zhejiang-physics-bank/',
@@ -60,7 +61,7 @@ async function step(name, fn) {
     say(`✔ ${name}（${seconds}s）`);
     return result;
   } catch (e) {
-    evidence.steps.push({ name, ok: false, seconds: +((Date.now() - started) / 1000).toFixed(1), error: e.message, ...(e.result ? { remote: e.result } : {}) });
+    evidence.steps.push({ name, ok: false, seconds: +((Date.now() - started) / 1000).toFixed(1), error: describeError(e), ...(e.result ? { remote: e.result } : {}) });
     throw e;
   }
 }
@@ -71,14 +72,13 @@ function saveEvidence(ok) {
   if (command === 'run' && !dryRun) writeJson('.local/evidence/publish/latest.json', evidence, true);
   return file;
 }
-async function fetchJson(url, init = {}) {
-  const r = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(20000), ...init });
-  const text = await r.text();
+async function fetchJson(url, init = {}, options = {}) {
+  const { response: r, value: text } = await request(url, init, { log: say, ...options });
   let value = null;
   try { value = JSON.parse(text); } catch { /* reported by the caller through status */ }
   return { status: r.status, ok: r.ok, value, text };
 }
-const tryFetchJson = async url => { try { return await fetchJson(url); } catch (e) { return { ok: false, error: e.cause?.code || e.cause?.message || e.message }; } };
+const tryFetchJson = async url => { try { return await fetchJson(url); } catch (e) { return { ok: false, error: e.message }; } };
 
 // ---------- local state ----------
 const publicState = () => { const p = loadPublicDir('public'); return { ...p, summary: totals(p) }; };
@@ -149,7 +149,9 @@ async function smokeJob(pub, preferred) {
   if (!chosen.length) chosen.push(pool[0]);
   const body = { title: `发布自检 ${stamp.slice(0, 16)}`, answers: true, items: chosen.map(q => ({ id: q.id, fingerprint: q.fingerprint })) };
   const headers = { 'Content-Type': 'application/json', Origin: config.pdf_origin };
-  let job = await fetchJson(config.pdf_url + '/bank-pdf/jobs', { method: 'POST', headers, body: JSON.stringify(body) });
+  // Store.submit deduplicates the same request hash while queued/running/succeeded.
+  // Keep exactly the same title, selection and body on retries after a lost response.
+  let job = await fetchJson(config.pdf_url + '/bank-pdf/jobs', { method: 'POST', headers, body: JSON.stringify(body) }, { idempotent: true });
   assert(job.ok, `PDF 任务提交失败（HTTP ${job.status}）：${job.value?.message || job.text.slice(0, 200)}`);
   const id = job.value.job_id, deadline = Date.now() + 240000;
   while (['queued', 'running'].includes(job.value.status)) {
@@ -160,8 +162,8 @@ async function smokeJob(pub, preferred) {
   assert.equal(job.value.status, 'succeeded', `PDF 任务失败：${job.value.message || job.value.status}（任务 ${id}）`);
   const files = [];
   for (const f of job.value.files) {
-    const r = await fetch(config.pdf_url + f.url, { signal: AbortSignal.timeout(60000) });
-    const data = Buffer.from(await r.arrayBuffer());
+    const { response: r, value: bytes } = await request(config.pdf_url + f.url, {}, { timeoutMs: 60000, read: r => r.arrayBuffer(), log: say });
+    const data = Buffer.from(bytes);
     assert(r.ok && data.subarray(0, 5).toString() === '%PDF-' && sha(data) === f.sha256, `下载的 ${f.kind} PDF 校验失败`);
     const file = `.local/evidence/publish/${stamp}-${f.kind}.pdf`;
     fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, data);
@@ -257,7 +259,7 @@ async function publishSite(pub, diff) {
       assert(Date.now() < deadline, `线上数据版本仍为 ${live.value?.version || live.error}`);
     }
     const checks = { catalog_version: pub.summary.version };
-    for (const [name, p] of Object.entries({ index: '', ...(image ? { image } : {}) })) { const r = await fetch(config.site_url + p, { signal: AbortSignal.timeout(30000) }); assert(r.ok, `${name} HTTP ${r.status}`); checks[name] = r.status; }
+    for (const [name, p] of Object.entries({ index: '', ...(image ? { image } : {}) })) { const { response: r } = await request(config.site_url + p, {}, { timeoutMs: 30000, read: r => r.arrayBuffer(), log: say }); assert(r.ok, `${name} HTTP ${r.status}`); checks[name] = r.status; }
     return { head, ...checks };
   });
 }
@@ -265,7 +267,7 @@ async function publishSite(pub, diff) {
 // ---------- run ----------
 async function run() {
   const g0 = await step('检查工作区', () => {
-    if (gitOk('remote', 'get-url', config.git_remote)) spawnSync('git', ['fetch', '-q', config.git_remote, config.git_branch], { stdio: 'inherit' });
+    if (gitOk('remote', 'get-url', config.git_remote)) execFileSync('git', ['fetch', '-q', config.git_remote, config.git_branch], { stdio: 'inherit', timeout: 60000 });
     const g = gitState(), problems = [];
     if (g.branch !== config.git_branch) problems.push(`当前分支 ${g.branch}，发布只从 ${config.git_branch} 进行`);
     if (g.other_changes.length) problems.push(`数据以外有未提交改动：${g.other_changes.slice(0, 6).join(', ')}`);
