@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "export": "node scripts/export-bank.mjs",
-    "check:data": "node scripts/check-public.mjs",
+    "export": "node scripts/export-bank-expanded.mjs",
+    "check:data": "node scripts/check-public-expanded.mjs",
     "check:math": "node scripts/check-math.mjs",
     "test": "node --test tests/*.test.mjs",
     "build": "npm run check:data && tsc --noEmit && vite build",

@@ -21,7 +21,7 @@ class PublicCatalog:
         self.papers = {p['paper_id']: p for p in self.catalog['papers']}
         self.questions = {q['id']: q for q in self.index['questions']}
         self.releases = self.catalog['source_releases']
-        if set(self.releases) != ALLOWED_BANKS or len(self.questions) != 666:
+        if set(self.releases) != ALLOWED_BANKS or len(self.questions) != 810:
             raise ValueError('Unexpected public scope')
 
     def request(self, value):
