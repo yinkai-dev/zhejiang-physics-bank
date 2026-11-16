@@ -1,36 +1,33 @@
-// Deterministic public projection. Original releases remain read-only.
+// Deterministic public projection of the local bank snapshot. Original releases remain read-only.
+//
+//   node scripts/export-bank.mjs [--allow-change]
+//
+// No hard-coded totals: counts must agree with metadata/paper-catalog.json (refresh it with
+// scripts/sync-bank.mjs) and with the releases themselves. Compared with the projection currently
+// on disk, published questions may only be added or gain a source answer; removals or content
+// changes abort unless --allow-change is given after the owner has confirmed them.
 import fs from 'node:fs';
-import path from 'node:path';
-import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
+import { readJson, readLines, sha, canonical, pick, confined, parseArgs } from './lib/common.mjs';
+import { diffPublic, describeDiff, diffSummary, loadPublicDir } from './lib/diff.mjs';
 
-const root = process.cwd();
-const read = p => JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, ''));
-const lines = p => fs.readFileSync(p, 'utf8').trim().split(/\r?\n/).filter(Boolean).map(JSON.parse);
-const sha = b => createHash('sha256').update(b).digest('hex');
-const canonical = v => JSON.stringify(v && typeof v === 'object' ? (Array.isArray(v) ? v.map(v => JSON.parse(canonical(v))) : Object.fromEntries(Object.keys(v).sort().map(k => [k, JSON.parse(canonical(v[k]))]))) : v);
-const write = (p, v) => { fs.mkdirSync(path.dirname(p), {recursive:true}); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
-const confined = (base, relative) => {
-  assert(!relative.includes('\\') && !relative.includes(':') && !relative.split('/').includes('..') && !path.isAbsolute(relative), `Unsafe path: ${relative}`);
-  const p = path.resolve(base, relative);
-  assert(p.startsWith(path.resolve(base) + path.sep));
-  assert(!fs.lstatSync(p).isSymbolicLink(), 'Symlink forbidden');
-  return p;
-};
-const active = read('.local/banks/active.json');
-const report = read('.local/import-report.json');
+const args = parseArgs(process.argv.slice(2), { flags: ['allow-change'] });
+const write = (p, v) => { fs.mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
+const active = readJson('.local/banks/active.json');
+const report = readJson('.local/import-report.json');
 assert.deepEqual(active, report.releases, 'Import report release mismatch');
 for (const f of report.files) {
   const p = confined('.local/banks', f.path), b = fs.readFileSync(p);
   assert.equal(b.length, f.bytes, f.path);
   assert.equal(sha(b), f.sha256, `Source drift: ${f.path}`);
 }
-const catalog = read('metadata/paper-catalog.json');
+const catalog = readJson('metadata/paper-catalog.json');
+assert.deepEqual(Object.keys(active).sort(), catalog.collections.map(c => c.collection_id).sort(), 'Active banks differ from catalog collections');
 const paperFields = ['paper_id','collection_id','source_document_id','title','target_year','target_session','exam_year','exam_month','exam_date','date_basis','exam_kind','official_session','original_classification','question_count','source_answer_count','metadata_review_status'];
-const pick = (v, keys) => Object.fromEntries(keys.map(k => [k,v[k]]));
 const papers = catalog.papers.map(p => pick(p, paperFields));
 const index = [], assets = new Map(), details = new Map(papers.map(p => [p.paper_id, []]));
 const answerCounts = {source:0, missing:0, not_ingested:0};
+const perCollection = Object.fromEntries(catalog.collections.map(c => [c.collection_id, {questions:0, source:0, missing:0, not_ingested:0}]));
 const blockCounts = {};
 
 function projectBlocks(blocks, assetMap, base, qid) {
@@ -68,16 +65,16 @@ for (const [collection, release] of Object.entries(active)) {
   const base = `.local/banks/${collection}/releases/${release.release_id}`;
   assert.equal(sha(fs.readFileSync(base+'/SHA256SUMS')), release.release_sums_sha256);
   const pkg = base+'/question-package';
-  const qs = lines(pkg+'/questions.jsonl');
-  const tags = read(base+'/tags.json').questions;
+  const qs = readLines(pkg+'/questions.jsonl');
+  const tags = readJson(base+'/tags.json').questions;
   const tagMap = new Map(tags.map(t => [t.question_id,t]));
   assert.equal(tagMap.size, qs.length);
-  const qassets = new Map(lines(pkg+'/asset-manifest.jsonl').map(a => [`${a.question_id}:${a.asset_id}`,a]));
-  const releaseInfo = read(base+'/release.json');
+  const qassets = new Map(readLines(pkg+'/asset-manifest.jsonl').map(a => [`${a.question_id}:${a.asset_id}`,a]));
+  const releaseInfo = readJson(base+'/release.json');
   const aid = releaseInfo.components.answers?.answer_package_id;
   const answerBase = aid ? `${base}/answers/${aid}` : null;
-  const answers = new Map(answerBase ? lines(answerBase+'/answers.jsonl').map(a => [a.question_id,a]) : []);
-  const aassets = new Map(answerBase ? lines(answerBase+'/asset-manifest.jsonl').map(a => [`${a.question_id}:${a.asset_id}`,a]) : []);
+  const answers = new Map(answerBase ? readLines(answerBase+'/answers.jsonl').map(a => [a.question_id,a]) : []);
+  const aassets = new Map(answerBase ? readLines(answerBase+'/asset-manifest.jsonl').map(a => [`${a.question_id}:${a.asset_id}`,a]) : []);
   if (answerBase) assert.equal(answers.size, qs.length, 'Incomplete answer coverage');
   for (const q of qs) {
     assert.equal(q.review_status, 'approved', q.question_id);
@@ -85,7 +82,7 @@ for (const [collection, release] of Object.entries(active)) {
     const tag = tagMap.get(q.question_id);
     assert.equal(tag.question_sha256, fp, 'Tag fingerprint mismatch: '+q.question_id);
     const paperId = `${collection}--${q.document_id}`;
-    assert(details.has(paperId), 'Unknown paper '+paperId);
+    assert(details.has(paperId), `Unknown paper ${paperId}; run scripts/sync-bank.mjs to refresh the catalog`);
     const id = `${collection}--${q.question_id}`;
     const a = answers.get(q.question_id);
     if (a) {
@@ -95,7 +92,7 @@ for (const [collection, release] of Object.entries(active)) {
       assert(['source','missing'].includes(a.status));
     }
     const status = a?.status || 'not_ingested';
-    answerCounts[status]++;
+    answerCounts[status]++; perCollection[collection][status]++; perCollection[collection].questions++;
     const type = tag.question_type === '选择题' ? (tag.choice_mode === 'multiple' ? '多选题' : '单选题') : tag.question_type;
     assert(['单选题','多选题','实验题','计算题'].includes(type));
     assert(tag.topics.length && tag.topics.every(t => ['力学','电学','光学','热学','近代物理'].includes(t)));
@@ -104,25 +101,39 @@ for (const [collection, release] of Object.entries(active)) {
     details.get(paperId).push({...pick(summary,['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint']),body:projectBlocks(q.body,qassets,pkg,q.question_id),choices:q.choices.map(c => projectBlocks(c,qassets,pkg,q.question_id)),answer:{status,key:a?.key || null,body:a ? projectBlocks(a.body,aassets,answerBase,q.question_id) : []}});
   }
 }
-assert.equal(papers.length,37); assert.equal(index.length,666); assert.equal(new Set(index.map(q=>q.id)).size,666);
-assert.deepEqual(answerCounts,{source:463,missing:5,not_ingested:198});
+// Acceptance contract derived from the data itself: catalog metadata, releases and projection agree.
+assert.equal(new Set(index.map(q=>q.id)).size, index.length, 'Duplicate public question id');
+assert.equal(index.length, papers.reduce((s,p)=>s+p.question_count,0), 'Catalog question total differs from releases; run scripts/sync-bank.mjs');
+for (const c of catalog.collections) {
+  const actual = perCollection[c.collection_id], hint = `${c.collection_id}: catalog differs from release; run scripts/sync-bank.mjs`;
+  assert.equal(papers.filter(p=>p.collection_id===c.collection_id).length, c.paper_count, hint);
+  assert.deepEqual([actual.questions,actual.source,actual.missing,actual.not_ingested],[c.question_count,c.source_answer_count,c.explicitly_missing_answer_count,c.answer_not_ingested_count], hint);
+}
 for (const p of papers) {
   const qs = details.get(p.paper_id).sort((a,b)=>a.order-b.order);
-  assert.equal(qs.length, p.question_count);
-  assert.equal(qs.filter(q=>q.answer_status==='source').length,p.source_answer_count);
+  assert.equal(qs.length, p.question_count, p.paper_id);
+  assert.equal(qs.filter(q=>q.answer_status==='source').length,p.source_answer_count, p.paper_id);
   // Compare the actual source number set; no positional question-type inference.
   assert.equal(new Set(qs.map(q=>q.number)).size,qs.length);
 }
-// Explicit generated output directories only; refuse unexpected stale assets.
+const version = sha(canonical({papers,index,source_releases:active}));
+// Regression guard against the projection currently on disk (normally the last published one).
+const diff = diffPublic(loadPublicDir('public'), {catalog:{papers,version},index,paper:id=>details.get(id)||null});
+for (const line of describeDiff(diff)) console.error(line);
+assert(!diff.blocking || args['allow-change'], 'Published questions would be removed or changed. Stop and confirm with the owner; then re-run with --allow-change.');
+// Explicit generated output directories only. Stale files are removed only when changes were allowed.
 for (const [dir, expected] of [['public/data/papers',new Set(papers.map(p=>p.paper_id+'.json'))],['public/images',new Set([...assets.keys()].map(p=>p.split('/').at(-1)))]]) {
   fs.mkdirSync(dir,{recursive:true});
-  for(const f of fs.readdirSync(dir)) assert(expected.has(f), `Unexpected stale output: ${dir}/${f}; review before removal`);
+  for(const f of fs.readdirSync(dir)) {
+    if (expected.has(f)) continue;
+    assert(args['allow-change'], `Unexpected stale output: ${dir}/${f}; review before removal`);
+    fs.unlinkSync(`${dir}/${f}`);
+  }
 }
-const version = sha(canonical({papers,index,source_releases:active}));
 write('public/data/catalog.json',{schema_version:1,version,snapshot_date:catalog.snapshot_date,source_releases:active,collections:catalog.collections.map(c=>pick(c,['collection_id','label','target_year','target_session','paper_count','question_count','source_answer_count','explicitly_missing_answer_count','answer_not_ingested_count'])),papers});
 write('public/data/questions-index.json',{schema_version:1,version,questions:index});
 for(const [id,questions] of details) write(`public/data/papers/${id}.json`,{schema_version:1,paper_id:id,questions});
 for(const [p,b] of assets) fs.writeFileSync('public/'+p,b);
-const result={schema_version:1,version,papers:papers.length,questions:index.length,answers:answerCounts,assets:assets.size,asset_bytes:[...assets.values()].reduce((s,b)=>s+b.length,0),blocks:blockCounts,releases:Object.fromEntries(Object.entries(active).map(([k,v])=>[k,v.release_id])),source_files_verified:report.files.length};
+const result={schema_version:1,version,papers:papers.length,questions:index.length,answers:answerCounts,assets:assets.size,asset_bytes:[...assets.values()].reduce((s,b)=>s+b.length,0),blocks:blockCounts,releases:Object.fromEntries(Object.entries(active).map(([k,v])=>[k,v.release_id])),source_files_verified:report.files.length,diff:diffSummary(diff)};
 write('.local/evidence/export-report.json',result);
 console.log(JSON.stringify(result,null,2));

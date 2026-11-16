@@ -66,6 +66,32 @@ class ServiceTests(unittest.TestCase):
         preflight=self.client.options('/bank-pdf/jobs',headers={**ORIGIN,'Access-Control-Request-Method':'POST','Access-Control-Request-Headers':'content-type'})
         self.assertEqual(preflight.headers['access-control-allow-origin'],ORIGIN['Origin'])
 
+    def test_health_reports_data_size_from_catalog(self):
+        health = self.client.get('/bank-pdf/healthz').json()
+        catalog = json.loads((DATA/'catalog.json').read_text(encoding='utf8'))
+        self.assertEqual(health['public_version'],catalog['version'])
+        self.assertEqual(health['papers'],len(catalog['papers']))
+        self.assertEqual(health['questions'],sum(p['question_count'] for p in catalog['papers']))
+        self.assertTrue(health['bundle'])
+
+    def test_rejects_inconsistent_or_out_of_scope_catalog(self):
+        catalog = json.loads((DATA/'catalog.json').read_text(encoding='utf8'))
+        index = json.loads((DATA/'questions-index.json').read_text(encoding='utf8'))
+        def load(catalog_value,index_value):
+            with tempfile.TemporaryDirectory(dir=ROOT/'.local',prefix='pdf-test-') as d:
+                (Path(d)/'catalog.json').write_text(json.dumps(catalog_value),encoding='utf8')
+                (Path(d)/'questions-index.json').write_text(json.dumps(index_value),encoding='utf8')
+                return PublicCatalog(d)
+        self.assertEqual(len(load(catalog,index).questions),len(index['questions']))
+        dropped = copy.deepcopy(index);dropped['questions'].pop()
+        duplicated = copy.deepcopy(index);duplicated['questions'][-1] = duplicated['questions'][0]
+        orphan = copy.deepcopy(index);orphan['questions'][0]['paper_id'] = 'zj-27-shoukao--unknown'
+        other = copy.deepcopy(catalog);other['source_releases']['qiangji'] = {'release_id':'rel-0','release_sums_sha256':'0'*64}
+        stale = copy.deepcopy(index);stale['version'] = 'old'
+        for name,(c,i) in {'dropped':(catalog,dropped),'duplicated':(catalog,duplicated),'orphan':(catalog,orphan),
+                           'other-bank':(other,index),'version':(catalog,stale)}.items():
+            with self.assertRaises(ValueError,msg=name):load(c,i)
+
     def test_queue_bound_and_expiration(self):
         ids=[]
         for i in range(4):

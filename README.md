@@ -16,6 +16,8 @@
 
 2026-11-16：扩充 2027 首考 8 套 2611 模拟卷 144 题，题库增至 **45 卷 810 题**；补录 144 题原卷答案，来源答案 **607 题**，明确缺失 5 题、尚未入库 198 题；公开投影含 1,413 张实际引用图片。
 
+2026-11-16：题库更新改为一条命令的自动发布流程（见“更新题库”），去掉写死的数量合同与按批次脚本。
+
 | 入口 | 内容 |
 | --- | --- |
 | [实施方案](docs/实施方案.md) | 首版范围、页面、技术路线、后续迭代 |
@@ -51,7 +53,29 @@ npm run preview -- --port 4173
 
 开发和预览入口均使用 `/zhejiang-physics-bank/` 子路径。公式渲染器随站点发布，不依赖外部 CDN。
 
-更新题库时，先准备并校验 `.local/banks/active.json` 指向的来源，维护 `metadata/paper-catalog.json`，然后运行 `npm run export`、测试与生产构建。导出器检查全部来源文件哈希、题目指纹、答案指纹和引用图片；任何不一致会中止。PDF 服务部署需同步更新公开目录和冻结 release，见 [PDF 接口说明](pdf-service/README.md)。公开导出物提交后，main 的网站变更经 Actions 校验并部署 `dist/`；纯文档更新不触发重新部署。当前 `npm run export`／`npm run check:data` 使用扩充验收合同（45 卷／810 题）；`export-bank.mjs`、`check-public.mjs` 保留为首版 37 卷／666 题基线，不参与当前构建。
+### 更新题库
+
+题库有新 release 后，在 `main` 上运行一条命令即可把站点和 PDF 服务一起更新：
+
+```powershell
+node scripts/publish.mjs status          # 一屏查看本机、站点、PDF 服务是否同一数据版本
+node scripts/publish.mjs run --dry-run   # 只读预演：会新增什么、要向服务器上传多少
+node scripts/publish.mjs run             # 正式发布
+```
+
+`run` 依次执行：从题库同步快照并刷新 `metadata/paper-catalog.json` → 导出公开投影 → 数据／公式／接口测试与生产构建 → 与已发布数据对比 → 把缺少的题库 release 安装到 PDF 服务器 → 切换 PDF 服务并用新题真实生成一份 PDF → 提交并推送公开数据 → 等待 Pages 构建 → 验证线上版本。先更新 PDF 服务再发布站点，避免网页上出现暂时无法排版的新题。每一步幂等，中断后重跑会从未完成处继续；运行记录写入 `.local/evidence/publish/`。`--scope pdf` 或 `--scope site` 可只做一侧，`node scripts/publish.mjs rollback-pdf` 把 PDF 服务切回上一版。
+
+不再有写死的卷数题数。验收规则改为：目录元数据、题库 release 与导出结果三者数量一致；已上线的题目只能新增或补上来源答案，若会被移除或内容发生变化，导出和发布都会中止并列出题号，经确认后才可加 `--allow-change`。首页、“关于题库”、页面描述、测试和 PDF 接口的数量均从目录数据生成。
+
+向服务器传输时只上传服务器尚无的文件内容，其余在服务器上从已安装的 release 复用，再整体校验后原子安装；分块可续传。部署只新增 release 目录并切换 PDF 服务自己的指针，不修改原 MCP 服务及其 `active.json`。
+
+本机设置放在不入库的 `.local/publish-config.json`：
+
+```json
+{ "source_banks": "<题库 banks 根目录>", "ssh_host": "<~/.ssh/config 中的主机别名>" }
+```
+
+单独步骤仍可手动运行：`node scripts/sync-bank.mjs`（同步快照，新卷的年月从卷名 `物理卷-YYMM…` 推得，无法推得时用 `--paper-meta` 提供）、`npm run export`、`npm run check:data`。新机器只要有题库来源和已入库的 `metadata/paper-catalog.json`，同步加导出即可重建完全相同的公开数据。PDF 接口见 [PDF 接口说明](pdf-service/README.md)。main 的网站变更经 Actions 校验并部署 `dist/`；纯文档更新不触发重新部署。
 
 若仓库切换公开／私密后网站出现 404，先在 Settings → Pages 确认站点已启用，发布方式选择 GitHub Actions，再到 Actions → Build and deploy Pages → Run workflow，选择 main 重新部署。免费账户把公开仓库改为私密会使 Pages 自动下线，改回公开后仍需检查发布设置并重新部署，见 [GitHub 可见性说明](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility)。
 

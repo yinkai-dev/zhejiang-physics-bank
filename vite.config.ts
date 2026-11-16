@@ -5,6 +5,14 @@ import { cpSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 export default defineConfig({
   base: '/zhejiang-physics-bank/',
   plugins: [{
+    // Page descriptions quote the bank size; derive it from the published catalog.
+    name: 'bank-summary',
+    transformIndexHtml(html) {
+      const catalog=JSON.parse(readFileSync('public/data/catalog.json','utf8'));
+      const questions=catalog.papers.reduce((s:number,p:{question_count:number})=>s+p.question_count,0);
+      return html.replaceAll('__BANK_SUMMARY__',`${catalog.papers.length}卷${questions}题`);
+    }
+  },{
     name: 'local-mathjax',
     configureServer(server) {
       server.middlewares.use('/zhejiang-physics-bank/vendor/mathjax', (req,res,next)=>{

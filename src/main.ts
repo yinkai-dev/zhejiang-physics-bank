@@ -61,7 +61,8 @@ async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper
   main.append(heading('ZHEJIANG · PHYSICS','从一道原题，开始今天的练习。','按备考届别找试卷，按主题选原题。已有原卷答案随题查看，选好的题目可以生成 PDF。'));
   const collections=el('div','collection-grid');
   [...catalog.collections].sort((a,b)=>b.target_year-a.target_year).forEach(c=>{const a=link('',`index.html?year=${c.target_year}&session=${c.target_session}`,'collection-card');a.append(el('span','eyebrow',c.target_session==='first'?'首考备考':'二考备考'),el('strong','collection-year',String(c.target_year)),el('span','',`${c.paper_count} 卷 · ${c.question_count} 题`),el('span','card-arrow','↗'));collections.append(a);});main.append(collections);
-  const info=el('p','catalog-note','已收录 45 卷 · 810 道原题 · 607 题有来源答案。当前均为模拟、联考或诊断等备考卷。');main.append(info);
+  const sourceAnswers=index.filter(q=>q.answer_status==='source').length,officialPapers=catalog.papers.filter(p=>p.exam_kind==='official').length;
+  const info=el('p','catalog-note',`已收录 ${catalog.papers.length} 卷 · ${index.length} 道原题 · ${sourceAnswers} 题有来源答案。${officialPapers?`其中正式真题 ${officialPapers} 卷，其余为备考卷。`:'当前均为模拟、联考或诊断等备考卷。'}`);main.append(info);
   const layout=el('div','catalog-layout'),filterPanel=el('details','filters no-print');filterPanel.open=matchMedia('(min-width: 760px)').matches;
   const filterSummary=el('summary','filter-heading','筛选题库');filterPanel.append(filterSummary);
   const form=el('form','filter-form');form.setAttribute('aria-label','题库筛选');
@@ -167,14 +168,20 @@ async function worksheetPage(index:Summary[],papers:Map<string,Paper>) {
   include.addEventListener('change',async()=>{const a=area.querySelector<HTMLElement>('.worksheet-answers');if(a){a.hidden=!include.checked;print.disabled=true;try{await preparePrint();print.disabled=false;printStatus.textContent=`已就绪 · ${selected.length} 道题${include.checked?' · 附已有答案':''} · 打印时自动隐藏操作按钮`;}catch(e){printStatus.textContent=(e as Error).message;}}});
   await render();await pdf.restore();pdf.generate.disabled=!selected.length||selectionIssues(selected,index).length>0;
 }
-function aboutPage() {
+function aboutPage(catalog:Catalog) {
   main.classList.add('reading-page');main.append(heading('关于题库','让整理好的原题，方便地被使用。','面向浙江物理选考备考的公开静态题库。'));
-  const section=el('article','prose');section.innerHTML=`<h2>目前收录</h2><p>2025 二考 11 卷 198 题、2026 二考 21 卷 378 题、2027 首考 13 卷 234 题，共 45 卷 810 题。当前全部为模拟、联考、诊断等备考卷，尚未收录正式高考真题。</p><h2>年份与答案</h2><p>“2027 首考”表示备考目标，卷面实际考试可能在 2026 年。实际年月从原卷标题推得，并非逐卷重新确认的完整考试日期。</p><p>607 题有来源答案；2026 二考有 5 题明确缺失原卷答案，2025 二考 198 题尚未接入答案包；2027 首考的 8 套 2611 模拟卷共 144 题已补齐原卷答案。只有答案字母的题目不代表附有完整解题过程。本站不自动补写答案。</p><h2>使用方法</h2><p>组合年份、阶段、主题和题型筛选，或搜索试卷名与题目关键词。筛选取交集，同一维度多选取并集。题目加入“我的练习”后可调序、移除，再点击“生成 PDF”取得排版好的练习卷，并可同时生成独立的原卷答案 PDF。也保留浏览器打印。单题和筛选链接可以直接分享。</p><p>练习清单仅保存在当前浏览器，不跨设备同步。PDF 每次最多 50 题，文件保留 24 小时，请及时下载；持有文件链接的人可以访问。使用浏览器打印时请等待“已就绪”，推荐 A4 并关闭页眉页脚。长题可跨页。</p><h2>来源与状态</h2><p>题目文字、公式、题图、答案来自已整理的原卷内容，保留原卷标题与题号。主题和题型沿用来源 AI 分类，尚未经过教师逐题复核。工程校验只验证关联、转换和展示，不等于教师审核或教学效果证明。</p><p>网站代码、题目内容和第三方依赖分别管理。题目及原卷图片的权利属于相应权利人，本站的整理与公开展示不授予内容再许可。</p><h2>勘误与反馈</h2><p>如发现缺图、题文或答案问题，请附上单题链接和原卷题号；涉及内容权利的问题也可通过仓库反馈。</p>`;
+  const section=el('article','prose');section.innerHTML=`<h2>目前收录</h2><p data-about="collected"></p><h2>年份与答案</h2><p>“2027 首考”表示备考目标，卷面实际考试可能在 2026 年。实际年月从原卷标题推得，并非逐卷重新确认的完整考试日期。</p><p data-about="answers"></p><h2>使用方法</h2><p>组合年份、阶段、主题和题型筛选，或搜索试卷名与题目关键词。筛选取交集，同一维度多选取并集。题目加入“我的练习”后可调序、移除，再点击“生成 PDF”取得排版好的练习卷，并可同时生成独立的原卷答案 PDF。也保留浏览器打印。单题和筛选链接可以直接分享。</p><p>练习清单仅保存在当前浏览器，不跨设备同步。PDF 每次最多 50 题，文件保留 24 小时，请及时下载；持有文件链接的人可以访问。使用浏览器打印时请等待“已就绪”，推荐 A4 并关闭页眉页脚。长题可跨页。</p><h2>来源与状态</h2><p>题目文字、公式、题图、答案来自已整理的原卷内容，保留原卷标题与题号。主题和题型沿用来源 AI 分类，尚未经过教师逐题复核。工程校验只验证关联、转换和展示，不等于教师审核或教学效果证明。</p><p>网站代码、题目内容和第三方依赖分别管理。题目及原卷图片的权利属于相应权利人，本站的整理与公开展示不授予内容再许可。</p><h2>勘误与反馈</h2><p>如发现缺图、题文或答案问题，请附上单题链接和原卷题号；涉及内容权利的问题也可通过仓库反馈。</p>`;
+  // Totals come from the published catalog, so new papers need no copy edit here.
+  const groups=[...catalog.collections].sort((a,b)=>a.target_year-b.target_year||a.label.localeCompare(b.label)),sum=(f:(c:Catalog['collections'][number])=>number)=>groups.reduce((s,c)=>s+f(c),0);
+  const official=catalog.papers.filter(p=>p.exam_kind==='official').length;
+  section.querySelector('[data-about="collected"]')!.textContent=`${groups.map(c=>`${c.label} ${c.paper_count} 卷 ${c.question_count} 题`).join('、')}，共 ${sum(c=>c.paper_count)} 卷 ${sum(c=>c.question_count)} 题。${official?`其中正式真题 ${official} 卷，其余为模拟、联考、诊断等备考卷。`:'当前全部为模拟、联考、诊断等备考卷，尚未收录正式高考真题。'}`;
+  const gaps=[...groups.filter(c=>c.explicitly_missing_answer_count).map(c=>`${c.label}有 ${c.explicitly_missing_answer_count} 题明确缺失原卷答案`),...groups.filter(c=>c.answer_not_ingested_count).map(c=>`${c.label} ${c.answer_not_ingested_count} 题尚未接入答案包`)];
+  section.querySelector('[data-about="answers"]')!.textContent=`${sum(c=>c.source_answer_count)} 题有来源答案${gaps.length?'；'+gaps.join('，'):''}。只有答案字母的题目不代表附有完整解题过程。本站不自动补写答案。`;
   const repo=el('p');const a=el('a','','在 GitHub 提交反馈 ↗');a.href='https://github.com/yinkai-dev/zhejiang-physics-bank/issues';a.target='_blank';a.rel='noopener noreferrer';repo.append(a);section.append(repo,link('第三方依赖声明','THIRD_PARTY_NOTICES.txt'));main.append(section);
 }
 async function start() {
   if(storageWarning)main.append(alertBox(storageWarning));
-  if(page==='about.html'){aboutPage();return;}
+  if(page==='about.html'){aboutPage(await getCatalog());return;}
   const loading=el('p','loading','正在打开题库…');main.append(loading);
   const [catalog,index]=await Promise.all([getCatalog(),getIndex()]);loading.remove();
   const papers=new Map(catalog.papers.map(p=>[p.paper_id,p]));

@@ -153,7 +153,10 @@ def create_app(data_dir=None, state_dir=None, banks_dir=None, run_worker=True):
         return result
 
     async def health(request):
-        return JSONResponse({'status':'ok','renderer':'XeLaTeX','max_questions':50,'retention_hours':24,'public_version':public.catalog['version']})
+        # `bundle` is the deployed directory name (code+catalog); `public_version` is the data version.
+        return JSONResponse({'status':'ok','renderer':'XeLaTeX','max_questions':50,'retention_hours':24,
+            'public_version':public.catalog['version'],'papers':len(public.papers),'questions':len(public.questions),
+            'bundle':Path(__file__).resolve().parent.parent.name})
 
     async def submit(request:Request):
         # Caddy overwrites the real client IP; Uvicorn listens on loopback only.

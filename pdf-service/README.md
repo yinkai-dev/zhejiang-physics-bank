@@ -22,4 +22,11 @@ GitHub Pages 继续承载静态题库；本服务仅负责按公开题目 ID 生
 
 生产参考单元为 `zjpdf.service`，仅绑定回环地址，由现有 HTTPS 反向代理增加独立 `/bank-pdf/*` 路由。代理必须覆盖 `X-Real-IP` 为真实对端地址，并限制请求体32KiB；不记录访问日志中的任务链接。编译子进程限制CPU时间、输出大小及180秒墙钟，禁用shell escape。源码、原始题包、TeX和诊断日志不通过下载接口公开。
 
-服务更新：将本目录及已校验 `public/data/catalog.json`、`questions-index.json` 打包到新的发布目录，核对归档SHA，切换本服务的current指针并重启本服务；保留旧发布目录可回退。不要重启或修改已有 MCP API/worker。首次部署与后续验证证据仅留在项目 `.local/`。
+服务更新由仓库根的 `node scripts/publish.mjs run` 完成，服务器一侧的逻辑在本目录 `deploy_remote.py`：
+
+1. 探测：哪些题库 release 已安装、哪些文件内容服务器还没有（只读）。
+2. 安装 release：只上传缺少的内容，其余从服务器已装 release 复用；在临时目录重建后逐文件核对 SHA256、用引擎的 `verify_release` 整体校验，再原子改名到 `<banks>/<bank>/releases/<release>`。不修改 `active.json`。
+3. 切换：本目录代码与 `public/data/catalog.json`、`questions-index.json` 组成一个按内容命名的 bundle；确认目录引用的 release 均已安装、新 bundle 能加载目录后，才切换 `current` 并重启本服务，等待健康检查返回新数据版本；不健康则自动切回原 bundle。
+4. 发布脚本随后经公网提交一个真实任务（新题，含答案）并核对下载的 PDF，失败同样回滚。
+
+一次部署只需三次 SSH 连接；上传按 2 MB 分块校验，中断后重跑只补传缺少的分块。`healthz` 同时返回数据版本 `public_version`、题量和当前 bundle。数量不写死：接口启动时核对目录与索引一致，范围仍限定浙江三库。保留旧 bundle 目录可回退（`node scripts/publish.mjs rollback-pdf`）。不要重启或修改已有 MCP API/worker。部署记录仅留在项目 `.local/evidence/publish/`。

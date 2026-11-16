@@ -21,8 +21,14 @@ class PublicCatalog:
         self.papers = {p['paper_id']: p for p in self.catalog['papers']}
         self.questions = {q['id']: q for q in self.index['questions']}
         self.releases = self.catalog['source_releases']
-        if set(self.releases) != ALLOWED_BANKS or len(self.questions) != 810:
+        if set(self.releases) != ALLOWED_BANKS:
             raise ValueError('Unexpected public scope')
+        # Size is derived from the catalog, so a data update needs no code change here.
+        rows = self.index['questions']
+        if (not rows or len(self.questions) != len(rows)
+                or len(rows) != sum(p['question_count'] for p in self.catalog['papers'])
+                or any(q['paper_id'] not in self.papers for q in rows)):
+            raise ValueError('Public catalog/index inconsistent')
 
     def request(self, value):
         if not isinstance(value, dict) or set(value) != {'title', 'answers', 'items'}:
