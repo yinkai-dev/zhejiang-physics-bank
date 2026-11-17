@@ -1,7 +1,7 @@
 // One command from "bank release is active locally" to "site and PDF service serve it".
 //
 //   node scripts/publish.mjs status [--server] [--json]
-//   node scripts/publish.mjs run [--dry-run] [--scope pdf,site] [--skip-sync] [--allow-change] [--message <text>]
+//   node scripts/publish.mjs run [--dry-run] [--scope pdf,site] [--skip-sync] [--paper-meta <json>] [--allow-change] [--message <text>]
 //   node scripts/publish.mjs rollback-pdf [--bundle <id>]
 //
 // run: sync snapshot -> export -> verify -> guard against published data -> install bank releases
@@ -31,7 +31,7 @@ const DATA_PATHS = ['public/data', 'public/images', 'metadata/paper-catalog.json
 const BUNDLE_FILES = ['pdf-service/app.py', 'pdf-service/contract.py', 'pdf-service/compile_job.py', 'pdf-service/test_service.py', 'pdf-service/requirements.txt', 'pdf-service/README.md', 'pdf-service/zjpdf.service', 'pdf-service/deploy_remote.py', 'public/data/catalog.json', 'public/data/questions-index.json'];
 
 const [command = 'status', ...rest] = process.argv.slice(2);
-const args = parseArgs(rest, { flags: ['dry-run', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle'] });
+const args = parseArgs(rest, { flags: ['dry-run', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle', 'paper-meta'] });
 const local = loadConfig();
 const config = { ...DEFAULTS, ...local, remote: { ...DEFAULTS.remote, ...(local.remote || {}) } };
 const dryRun = !!args['dry-run'];
@@ -279,7 +279,10 @@ async function run() {
   if (!args['skip-sync']) {
     assert(config.source_banks, '缺少 source_banks：在 .local/publish-config.json 中配置，或加 --skip-sync');
     const synced = await step(dryRun ? '同步题库快照（预演）' : '同步题库快照', () => {
-      const s = lastJson(runNode('scripts/sync-bank.mjs', dryRun ? ['--dry-run'] : [], { capture: true }));
+      const syncArgs = dryRun ? ['--dry-run'] : [];
+      const metaPath = args['paper-meta'] || config.paper_meta;
+      if (metaPath) syncArgs.push('--paper-meta', path.resolve(metaPath));
+      const s = lastJson(runNode('scripts/sync-bank.mjs', syncArgs, { capture: true }));
       for (const b of s.banks) say(`  ${b.bank_id}  ${b.pointer_changed ? `${b.previous_release_id} → ${b.release_id}，新增 ${b.added_papers.length} 卷` : `${b.release_id}（未变）`}`);
       return s;
     });

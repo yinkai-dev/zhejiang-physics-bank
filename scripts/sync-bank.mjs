@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { readJson, readLines, writeJson, verifyReleaseTree, validPointer, parseArgs, loadConfig, sha } from './lib/common.mjs';
+import { buildNewPaper } from './lib/paper-meta.mjs';
 
 const args = parseArgs(process.argv.slice(2), { flags: ['dry-run', 'allow-removal'], values: ['source', 'root', 'paper-meta'], multi: ['bank'] });
 const root = path.resolve(args.root || process.cwd());
@@ -39,22 +40,7 @@ const summary = { dry_run: dryRun, source_root: sourceRoot, banks: [] };
 let changed = false;
 
 function newPaper(collection, doc, questionCount, sourceAnswers) {
-  const paperId = `${collection.collection_id}--${doc.document_id}`;
-  const override = paperMeta[paperId] || {};
-  const m = /^物理卷-(\d{2})(\d{2})/.exec(doc.title);
-  const derived = m && Number(m[2]) >= 1 && Number(m[2]) <= 12
-    ? { exam_year: 2000 + Number(m[1]), exam_month: Number(m[2]), date_basis: 'source_title_yymm' } : null;
-  assert(derived || ('exam_year' in override && 'exam_month' in override && override.date_basis),
-    `Cannot derive exam year/month from title "${doc.title}". Provide --paper-meta with {"${paperId}":{"exam_year":…,"exam_month":…,"date_basis":"…"}}`);
-  return {
-    paper_id: paperId, collection_id: collection.collection_id, source_document_id: doc.document_id,
-    title: doc.title, target_year: collection.target_year, target_session: collection.target_session,
-    exam_year: null, exam_month: null, exam_date: null, date_basis: null,
-    exam_kind: 'practice', official_session: null, original_classification: collection.label,
-    question_count: questionCount, source_answer_count: sourceAnswers,
-    metadata_review_status: 'classification_preserved_date_inferred',
-    ...derived, ...override,
-  };
+  return buildNewPaper(collection, doc, questionCount, sourceAnswers, paperMeta);
 }
 
 for (const bankId of banks) {
