@@ -1,6 +1,6 @@
 # PDF 接口
 
-GitHub Pages 继续承载静态题库；本服务仅负责按公开题目 ID 生成 XeLaTeX PDF。它使用独立账户、队列、SQLite 状态与文件目录，读取冻结浙江三库和已有 `physics-worksheet-mcp 0.1.2` 排版引擎，不调用原 MCP 账户或任务接口，不改其代码和状态。
+GitHub Pages 继续承载静态题库；本服务仅负责按公开题目 ID 生成 XeLaTeX PDF。它使用独立账户、队列、SQLite 状态与文件目录，读取公开目录中已授权的冻结题库和已有 `physics-worksheet-mcp 0.1.2` 排版引擎，不调用原 MCP 账户或任务接口，不改其代码和状态。
 
 引擎来源：[physics-worksheet-mcp](https://github.com/yinkai-dev/physics-worksheet-mcp)，0.1.2（部署版本 `6910da0`），AGPL-3.0-or-later。本目录为配套公开接口源码；上游引擎仍遵循其许可证。生产 Python 环境为固定版本、只读复用，不向原环境安装或升级依赖。
 
@@ -29,4 +29,4 @@ GitHub Pages 继续承载静态题库；本服务仅负责按公开题目 ID 生
 3. 切换：本目录代码与 `public/data/catalog.json`、`questions-index.json` 组成一个按内容命名的 bundle；确认目录引用的 release 均已安装、新 bundle 能加载目录后，才切换 `current` 并重启本服务，等待健康检查返回新数据版本；不健康则自动切回原 bundle。
 4. 发布脚本随后经公网提交一个真实任务（新题，含答案）并核对下载的 PDF，失败同样回滚。
 
-一次部署只需三次 SSH 连接；上传按 2 MB 分块校验，中断后重跑只补传缺少的分块。`healthz` 同时返回数据版本 `public_version`、题量和当前 bundle。数量不写死：接口启动时核对目录与索引一致，范围仍限定浙江三库。保留旧 bundle 目录可回退（`node scripts/publish.mjs rollback-pdf`）。不要重启或修改已有 MCP API/worker。部署记录仅留在项目 `.local/evidence/publish/`。
+一次部署只需三次 SSH 连接；上传按 2 MB 分块校验，中断后重跑只补传缺少的分块。`healthz` 同时返回数据版本 `public_version`、题量和当前 bundle。数量不写死：接口启动时核对目录与索引一致，范围按公开集合白名单和实际发布目录共同校验。保留旧 bundle 目录可回退（`node scripts/publish.mjs rollback-pdf`）。不要重启或修改已有 MCP API/worker。部署记录仅留在项目 `.local/evidence/publish/`。

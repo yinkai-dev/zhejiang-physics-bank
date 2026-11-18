@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import { readJson, readLines, sha, canonical, pick, confined, parseArgs } from './lib/common.mjs';
 import { diffPublic, describeDiff, diffSummary, loadPublicDir } from './lib/diff.mjs';
+import { awaitingFirstRelease } from './lib/paper-meta.mjs';
 
 const args = parseArgs(process.argv.slice(2), { flags: ['allow-change'] });
 const write = (p, v) => { fs.mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
@@ -22,6 +23,7 @@ for (const f of report.files) {
   assert.equal(sha(b), f.sha256, `Source drift: ${f.path}`);
 }
 const catalog = readJson('metadata/paper-catalog.json');
+catalog.collections = catalog.collections.filter(c => !awaitingFirstRelease(c, catalog.papers));
 assert.deepEqual(Object.keys(active).sort(), catalog.collections.map(c => c.collection_id).sort(), 'Active banks differ from catalog collections');
 const paperFields = ['paper_id','collection_id','source_document_id','title','target_year','target_session','exam_year','exam_month','exam_date','date_basis','exam_kind','official_session','original_classification','question_count','source_answer_count','metadata_review_status'];
 const papers = catalog.papers.map(p => pick(p, paperFields));

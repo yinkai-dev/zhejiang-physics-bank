@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { readJson, readLines, writeJson, verifyReleaseTree, validPointer, parseArgs, loadConfig, sha } from './lib/common.mjs';
-import { buildNewPaper } from './lib/paper-meta.mjs';
+import { awaitingFirstRelease, buildNewPaper } from './lib/paper-meta.mjs';
 
 const args = parseArgs(process.argv.slice(2), { flags: ['dry-run', 'allow-removal'], values: ['source', 'root', 'paper-meta'], multi: ['bank'] });
 const root = path.resolve(args.root || process.cwd());
@@ -45,6 +45,12 @@ function newPaper(collection, doc, questionCount, sourceAnswers) {
 
 for (const bankId of banks) {
   const pointer = sourceActive[bankId];
+  const collection = catalog.collections.find(c => c.collection_id === bankId);
+  if (awaitingFirstRelease(collection, catalog.papers) && !Object.hasOwn(sourceActive, bankId)) {
+    assert(!Object.hasOwn(localActive, bankId), `Missing source for installed bank: ${bankId}`);
+    assert(!args.bank, `First source release unavailable: ${bankId}`);
+    continue;
+  }
   assert(validPointer(pointer), `Invalid source pointer for ${bankId}`);
   const relative = `${bankId}/releases/${pointer.release_id}`;
   const sourceRelease = path.join(sourceRoot, relative);
@@ -69,7 +75,12 @@ for (const bankId of banks) {
   Object.assign(entry, { files: files.length, copied_files: copied, copied_bytes: copiedBytes, pointer_changed: !samePointer });
 
   // 2. Pointer and import report (old release entries stay; they remain verifiable on disk).
-  if (!samePointer) { localActive[bankId] = pointer; report.releases[bankId] = pointer; changed = true; }
+  if (!samePointer) { localActive[bankId] = pointer; changed = true; }
+  const recorded = report.releases[bankId];
+  if (recorded?.release_id !== pointer.release_id || recorded.release_sums_sha256 !== pointer.release_sums_sha256) {
+    report.releases[bankId] = pointer;
+    changed = true;
+  }
   const added = files.map(f => ({ path: `${relative}/${f.path}`, sha256: f.sha256, bytes: f.bytes })).filter(f => !reportPaths.has(f.path));
   if (added.length) {
     report.files = report.files.concat(added); added.forEach(f => reportPaths.add(f.path));
@@ -85,8 +96,8 @@ for (const bankId of banks) {
   const questions = readLines(path.join(sourceRelease, 'question-package/questions.jsonl'));
   const answerId = release.components.answers?.answer_package_id;
   const answers = answerId ? readLines(path.join(sourceRelease, 'answers', answerId, 'answers.jsonl')) : [];
-  const collection = catalog.collections.find(c => c.collection_id === bankId);
   const before = JSON.stringify([collection, catalog.papers.filter(p => p.collection_id === bankId)]);
+  delete collection.pending_first_release;
   Object.assign(collection, {
     paper_count: pkg.documents.length, question_count: questions.length,
     question_image_count: release.components.question_package.required_asset_count,

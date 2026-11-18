@@ -2,6 +2,15 @@ import assert from 'node:assert/strict';
 
 const LIKELY_OFFICIAL_TITLE = /真题|普通高校招生选考|选考科目考试/;
 
+// Only collections explicitly registered before their first release may lack a pointer.
+export function awaitingFirstRelease(collection, papers) {
+  if (collection.pending_first_release !== true) return false;
+  assert(collection.paper_count === 0 && collection.question_count === 0 &&
+    !papers.some(paper => paper.collection_id === collection.collection_id),
+    `Pending first release has catalogued papers: ${collection.collection_id}`);
+  return true;
+}
+
 export function buildNewPaper(collection, doc, questionCount, sourceAnswers, paperMeta = {}) {
   const paperId = `${collection.collection_id}--${doc.document_id}`;
   const override = paperMeta[paperId] || paperMeta[doc.document_id] || {};

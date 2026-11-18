@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-ALLOWED_BANKS = frozenset({'zj-25-erkao', 'zj-26-erkao', 'zj-27-shoukao'})
+ALLOWED_BANKS = frozenset({'zj-25-erkao', 'zj-26-erkao', 'zj-26-shoukao', 'zj-27-shoukao'})
 MAX_QUESTIONS = 50
 
 
@@ -21,7 +21,9 @@ class PublicCatalog:
         self.papers = {p['paper_id']: p for p in self.catalog['papers']}
         self.questions = {q['id']: q for q in self.index['questions']}
         self.releases = self.catalog['source_releases']
-        if set(self.releases) != ALLOWED_BANKS:
+        published_banks = {c['collection_id'] for c in self.catalog['collections']}
+        paper_banks = {p['collection_id'] for p in self.papers.values()}
+        if not (published_banks == set(self.releases) == paper_banks and published_banks <= ALLOWED_BANKS):
             raise ValueError('Unexpected public scope')
         # Size is derived from the catalog, so a data update needs no code change here.
         rows = self.index['questions']

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildNewPaper } from '../scripts/lib/paper-meta.mjs';
+import { awaitingFirstRelease, buildNewPaper } from '../scripts/lib/paper-meta.mjs';
 
 const shoukao = {
   collection_id: 'zj-27-shoukao',
@@ -49,4 +49,12 @@ test('official exam merges into target preparation collection and never silently
   assert.equal(official.exam_year, 2026);
   assert.equal(official.exam_month, 1);
   assert.equal(official.metadata_review_status, 'official_source_verified');
+});
+
+test('only an explicitly empty new collection can await its first release', () => {
+  const pending = { ...shoukao, pending_first_release: true, paper_count: 0, question_count: 0 };
+  assert.equal(awaitingFirstRelease(pending, []), true);
+  assert.equal(awaitingFirstRelease(shoukao, []), false);
+  assert.throws(() => awaitingFirstRelease({ ...pending, question_count: 1 }, []));
+  assert.throws(() => awaitingFirstRelease(pending, [{ collection_id: pending.collection_id }]));
 });

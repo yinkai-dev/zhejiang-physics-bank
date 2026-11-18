@@ -24,9 +24,10 @@ class ServiceTests(unittest.TestCase):
         self.app = create_app(DATA,self.temp.name,ROOT/'.local'/'banks',run_worker=False)
         self.client = TestClient(self.app)
         self.catalog = PublicCatalog(DATA)
-        ids = [next(q['id'] for q in self.catalog.questions.values() if q['id'].startswith(c))
-               for c in ['zj-25-erkao','zj-26-erkao','zj-27-shoukao']]
-        self.body = {'title':'三库专项练习','answers':True,'items':[
+        self.public_banks = [c['collection_id'] for c in self.catalog.catalog['collections']]
+        ids = [next(q['id'] for q in self.catalog.questions.values() if self.catalog.papers[q['paper_id']]['collection_id'] == c)
+               for c in self.public_banks]
+        self.body = {'title':'跨库专项练习','answers':True,'items':[
             {'id':id,'fingerprint':self.catalog.questions[id]['fingerprint']} for id in ids]}
 
     def tearDown(self):
@@ -42,7 +43,7 @@ class ServiceTests(unittest.TestCase):
         job = r.json()
         self.assertEqual(job['status'],'queued')
         saved = json.loads((Path(self.temp.name)/job['job_id']/'request.json').read_text(encoding='utf8'))
-        self.assertEqual([x['ref'].split('/')[0] for x in saved['items']],['zj-25-erkao','zj-26-erkao','zj-27-shoukao'])
+        self.assertEqual([x['ref'].split('/')[0] for x in saved['items']], self.public_banks)
         self.assertEqual(self.post(self.body).json()['job_id'],job['job_id'])
         self.assertNotIn('releases',job)
 
@@ -88,9 +89,12 @@ class ServiceTests(unittest.TestCase):
         duplicated = copy.deepcopy(index);duplicated['questions'][-1] = duplicated['questions'][0]
         orphan = copy.deepcopy(index);orphan['questions'][0]['paper_id'] = 'zj-27-shoukao--unknown'
         other = copy.deepcopy(catalog);other['source_releases']['qiangji'] = {'release_id':'rel-0','release_sums_sha256':'0'*64}
+        private = copy.deepcopy(other)
+        private['collections'].append({'collection_id':'qiangji'})
+        private['papers'][0]['collection_id'] = 'qiangji'
         stale = copy.deepcopy(index);stale['version'] = 'old'
         for name,(c,i) in {'dropped':(catalog,dropped),'duplicated':(catalog,duplicated),'orphan':(catalog,orphan),
-                           'other-bank':(other,index),'version':(catalog,stale)}.items():
+                           'other-bank':(other,index),'private-bank':(private,index),'version':(catalog,stale)}.items():
             with self.assertRaises(ValueError,msg=name):load(c,i)
 
     def test_queue_bound_and_expiration(self):
