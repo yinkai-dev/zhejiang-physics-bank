@@ -1,6 +1,6 @@
 // Deterministic public projection of the local bank snapshot. Original releases remain read-only.
 //
-//   node scripts/export-bank.mjs [--allow-change]
+//   node scripts/export-bank.mjs [--allow-change] [--verify-history]
 //
 // No hard-coded totals: counts must agree with metadata/paper-catalog.json (refresh it with
 // scripts/sync-bank.mjs) and with the releases themselves. Compared with the projection currently
@@ -11,17 +11,13 @@ import assert from 'node:assert/strict';
 import { readJson, readLines, sha, canonical, pick, confined, parseArgs } from './lib/common.mjs';
 import { diffPublic, describeDiff, diffSummary, loadPublicDir } from './lib/diff.mjs';
 import { awaitingFirstRelease } from './lib/paper-meta.mjs';
+import { verifySnapshot } from './lib/snapshot.mjs';
 
-const args = parseArgs(process.argv.slice(2), { flags: ['allow-change'] });
+const args = parseArgs(process.argv.slice(2), { flags: ['allow-change', 'verify-history'] });
 const write = (p, v) => { fs.mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
 const pointers = readJson('.local/banks/active.json');
 const report = readJson('.local/import-report.json');
-assert.deepEqual(pointers, report.releases, 'Import report release mismatch');
-for (const f of report.files) {
-  const p = confined('.local/banks', f.path), b = fs.readFileSync(p);
-  assert.equal(b.length, f.bytes, f.path);
-  assert.equal(sha(b), f.sha256, `Source drift: ${f.path}`);
-}
+const verified = verifySnapshot('.local/banks', pointers, report, args['verify-history']);
 const catalog = readJson('metadata/paper-catalog.json');
 catalog.collections = catalog.collections.filter(c => !awaitingFirstRelease(c, catalog.papers));
 const collectionIds = catalog.collections.map(c => c.collection_id);
@@ -140,6 +136,6 @@ write('public/data/catalog.json',{schema_version:1,version,snapshot_date:catalog
 write('public/data/questions-index.json',{schema_version:1,version,questions:index});
 for(const [id,questions] of details) write(`public/data/papers/${id}.json`,{schema_version:1,paper_id:id,questions});
 for(const [p,b] of assets) fs.writeFileSync('public/'+p,b);
-const result={schema_version:1,version,papers:papers.length,questions:index.length,answers:answerCounts,assets:assets.size,asset_bytes:[...assets.values()].reduce((s,b)=>s+b.length,0),blocks:blockCounts,releases:Object.fromEntries(Object.entries(active).map(([k,v])=>[k,v.release_id])),source_files_verified:report.files.length,diff:diffSummary(diff)};
+const result={schema_version:1,version,papers:papers.length,questions:index.length,answers:answerCounts,assets:assets.size,asset_bytes:[...assets.values()].reduce((s,b)=>s+b.length,0),blocks:blockCounts,releases:Object.fromEntries(Object.entries(active).map(([k,v])=>[k,v.release_id])),source_files_verified:verified.current+verified.archived,active_files_verified:verified.current,archived_files_verified:verified.archived,diff:diffSummary(diff)};
 write('.local/evidence/export-report.json',result);
 console.log(JSON.stringify(result,null,2));

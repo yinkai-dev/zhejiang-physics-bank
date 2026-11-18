@@ -1,7 +1,7 @@
 // One command from "bank release is active locally" to "site and PDF service serve it".
 //
 //   node scripts/publish.mjs status [--server] [--json]
-//   node scripts/publish.mjs run [--dry-run] [--scope pdf,site] [--skip-sync] [--paper-meta <json>] [--allow-change] [--message <text>]
+//   node scripts/publish.mjs run [--dry-run [--verify]] [--scope pdf,site] [--skip-sync] [--paper-meta <json>] [--allow-change] [--message <text>]
 //   node scripts/publish.mjs rollback-pdf [--bundle <id>]
 //
 // run: sync snapshot -> export -> verify -> guard against published data -> install bank releases
@@ -19,6 +19,7 @@ import { diffPublic, describeDiff, diffSummary, loadPublicDir, loadPublicGit, to
 import { Remote, buildBlob, blobSpec, fileEntry, pendingChunks } from './lib/remote.mjs';
 import { classifyStatus } from './lib/gitstate.mjs';
 import { request, describeError } from './lib/http.mjs';
+import { choosePdfSample } from './lib/pdf-sample.mjs';
 
 const DEFAULTS = {
   site_url: 'https://yinkai-dev.github.io/zhejiang-physics-bank/',
@@ -31,7 +32,7 @@ const DATA_PATHS = ['public/data', 'public/images', 'metadata/paper-catalog.json
 const BUNDLE_FILES = ['pdf-service/app.py', 'pdf-service/contract.py', 'pdf-service/compile_job.py', 'pdf-service/test_service.py', 'pdf-service/requirements.txt', 'pdf-service/README.md', 'pdf-service/zjpdf.service', 'pdf-service/deploy_remote.py', 'public/data/catalog.json', 'public/data/questions-index.json'];
 
 const [command = 'status', ...rest] = process.argv.slice(2);
-const args = parseArgs(rest, { flags: ['dry-run', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle', 'paper-meta'] });
+const args = parseArgs(rest, { flags: ['dry-run', 'verify', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle', 'paper-meta'] });
 const local = loadConfig();
 const config = { ...DEFAULTS, ...local, remote: { ...DEFAULTS.remote, ...(local.remote || {}) } };
 const dryRun = !!args['dry-run'];
@@ -144,9 +145,8 @@ async function status() {
 async function smokeJob(pub, preferred) {
   const papers = new Map(pub.catalog.papers.map(p => [p.paper_id, p]));
   const pool = preferred.length ? pub.index.filter(q => preferred.includes(q.id)) : pub.index.filter(q => q.paper_id === pub.catalog.papers.at(-1).paper_id);
-  const chosen = [];
-  for (const type of ['单选题', '实验题', '计算题']) { const q = pool.find(q => q.type === type && !chosen.includes(q)); if (q) chosen.push(q); }
-  if (!chosen.length) chosen.push(pool[0]);
+  const chosen = choosePdfSample(pool, papers);
+  assert(chosen.length, 'PDF 自检找不到公开题目');
   const body = { title: `发布自检 ${stamp.slice(0, 16)}`, answers: true, items: chosen.map(q => ({ id: q.id, fingerprint: q.fingerprint })) };
   const headers = { 'Content-Type': 'application/json', Origin: config.pdf_origin };
   // Store.submit deduplicates the same request hash while queued/running/succeeded.
@@ -160,6 +160,9 @@ async function smokeJob(pub, preferred) {
     job = await fetchJson(`${config.pdf_url}/bank-pdf/jobs/${id}`);
   }
   assert.equal(job.value.status, 'succeeded', `PDF 任务失败：${job.value.message || job.value.status}（任务 ${id}）`);
+  const sourceAnswers = chosen.filter(q => q.answer_status === 'source').length;
+  assert.equal(job.value.answers?.with_source_answer, sourceAnswers, 'PDF 自检原卷答案数量不符');
+  assert.deepEqual(job.value.files.map(f => f.kind).sort(), sourceAnswers ? ['answers', 'worksheet'] : ['worksheet'], 'PDF 自检缺少预期产物');
   const files = [];
   for (const f of job.value.files) {
     const { response: r, value: bytes } = await request(config.pdf_url + f.url, {}, { timeoutMs: 60000, read: r => r.arrayBuffer(), log: say });
@@ -289,7 +292,8 @@ async function run() {
     if (dryRun && synced.changed) say('  ⚠ 题库有新 release，dry-run 不改本机文件；以下计划基于当前已导出的投影，正式运行会先同步并重新导出。');
   }
   if (!dryRun) await step('导出公开投影', () => lastJson(runNode('scripts/export-bank.mjs', args['allow-change'] ? ['--allow-change'] : [], { capture: true })));
-  await step('校验与构建', () => {
+  if (dryRun && !args.verify) say('  本次仅预览发布计划。正式发布会执行数据、公式、接口和构建校验。');
+  else await step('校验与构建', () => {
     runNode('scripts/check-public.mjs', [], { capture: true });
     runNode('--test', ['tests/*.test.mjs'], { capture: true });
     const math = lastJson(runNode('scripts/check-math.mjs', [], { capture: true }));
@@ -299,7 +303,8 @@ async function run() {
     runNode('node_modules/typescript/bin/tsc', ['--noEmit']);
     runNode('node_modules/vite/bin/vite.js', ['build', '--logLevel', 'warn']);
     const dist = lastJson(runNode('scripts/check-public.mjs', ['dist'], { capture: true }));
-    return { formulas: math.count, formula_errors: math.errors, pdf_service_tests: pdfTests, dist };
+    return { formulas: math.count, formula_errors: math.errors, distinct_formulas_rendered: math.rendered,
+      distinct_formulas_reused: math.reused, pdf_service_tests: pdfTests, dist };
   });
   const pub = publicState();
   const diff = await step('对比已发布数据', () => {

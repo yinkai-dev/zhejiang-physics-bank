@@ -63,7 +63,9 @@ for (const bankId of banks) {
   // 1. Verify the source release completely, then mirror it (never overwriting differing files).
   const files = verifyReleaseTree(sourceRelease, pointer.release_sums_sha256);
   let copied = 0, copiedBytes = 0;
-  for (const f of files) {
+  // A release built in the site snapshot has already been verified in place above.
+  const filesToMirror = sourceRelease === destRelease ? [] : files;
+  for (const f of filesToMirror) {
     const dest = path.join(destRelease, f.path);
     if (fs.existsSync(dest)) { assert.equal(sha(fs.readFileSync(dest)), f.sha256, `Existing local snapshot differs: ${relative}/${f.path}`); continue; }
     copied++; copiedBytes += f.bytes;

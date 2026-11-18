@@ -63,9 +63,11 @@ npm run preview -- --port 4173
 
 ```powershell
 node scripts/publish.mjs status          # 一屏查看本机、站点、PDF 服务是否同一数据版本
-node scripts/publish.mjs run --dry-run   # 只读预演：会新增什么、要向服务器上传多少
+node scripts/publish.mjs run --dry-run   # 查看快照差异和当前公开投影的上传计划
 node scripts/publish.mjs run             # 正式发布
 ```
+
+`--dry-run` 只生成计划。需要提前诊断本机构建时可加 `--verify`，正式发布始终校验待部署的产物。正常导出校验本次引用的全部 release，历史归档可用 `node scripts/export-bank.mjs --verify-history` 一并核对。
 
 `run` 依次执行：从题库同步快照并刷新 `metadata/paper-catalog.json` → 导出公开投影 → 数据／公式／接口测试与生产构建 → 与已发布数据对比 → 把缺少的题库 release 安装到 PDF 服务器 → 切换 PDF 服务并用新题真实生成一份 PDF → 提交并推送公开数据 → 等待 Pages 构建 → 验证线上版本。先更新 PDF 服务再发布站点，避免网页上出现暂时无法排版的新题。每一步幂等，中断后重跑会从未完成处继续；运行记录写入 `.local/evidence/publish/`。`--scope pdf` 或 `--scope site` 可只做一侧，`node scripts/publish.mjs rollback-pdf` 把 PDF 服务切回上一版。
 
