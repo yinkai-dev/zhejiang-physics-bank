@@ -14,9 +14,9 @@ import { awaitingFirstRelease } from './lib/paper-meta.mjs';
 
 const args = parseArgs(process.argv.slice(2), { flags: ['allow-change'] });
 const write = (p, v) => { fs.mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
-const active = readJson('.local/banks/active.json');
+const pointers = readJson('.local/banks/active.json');
 const report = readJson('.local/import-report.json');
-assert.deepEqual(active, report.releases, 'Import report release mismatch');
+assert.deepEqual(pointers, report.releases, 'Import report release mismatch');
 for (const f of report.files) {
   const p = confined('.local/banks', f.path), b = fs.readFileSync(p);
   assert.equal(b.length, f.bytes, f.path);
@@ -24,7 +24,11 @@ for (const f of report.files) {
 }
 const catalog = readJson('metadata/paper-catalog.json');
 catalog.collections = catalog.collections.filter(c => !awaitingFirstRelease(c, catalog.papers));
-assert.deepEqual(Object.keys(active).sort(), catalog.collections.map(c => c.collection_id).sort(), 'Active banks differ from catalog collections');
+const collectionIds = catalog.collections.map(c => c.collection_id);
+assert.deepEqual(Object.keys(pointers).sort(), [...collectionIds].sort(), 'Active banks differ from catalog collections');
+// The ledger appends new papers. Follow their published order even when a registry rewrites its JSON keys.
+const bankOrder = new Set([...catalog.papers.map(p => p.collection_id), ...collectionIds]);
+const active = Object.fromEntries([...bankOrder].map(id => [id, pointers[id]]));
 const paperFields = ['paper_id','collection_id','source_document_id','title','target_year','target_session','exam_year','exam_month','exam_date','date_basis','exam_kind','official_session','original_classification','question_count','source_answer_count','metadata_review_status'];
 const papers = catalog.papers.map(p => pick(p, paperFields));
 const index = [], assets = new Map(), details = new Map(papers.map(p => [p.paper_id, []]));
