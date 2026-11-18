@@ -8,6 +8,7 @@ import unittest
 
 from starlette.testclient import TestClient
 from app import create_app
+from compile_job import sanitize_math_for_xelatex, sanitize_spec_for_xelatex
 from contract import PublicCatalog, RequestError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,6 +122,31 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/bank-pdf/files/{id}/answers').status_code,404)
         (directory/'worksheet.pdf').write_bytes(b'corrupted')
         self.assertEqual(self.client.get(f'/bank-pdf/files/{id}/worksheet').status_code,404)
+
+    def test_sanitize_math_for_xelatex(self):
+        cases = [
+            (r"v_{皮}=\frac{mg\sin\theta}{6k}", r"v_{\text{皮}}=\frac{mg\sin\theta}{6k}"),
+            (r"v_{\text{皮}}", r"v_{\text{皮}}"),
+            (r"v_皮", r"v_{\text{皮}}"),
+            (r"\mathrm{综上可得:} v _ {\mathrm{皮I}}", r"\mathrm{\text{综上可得}:} v _ {\mathrm{\text{皮}I}}"),
+            (r"\mathrm{W = Q + \Delta E_k}", r"\mathrm{W = Q + }\Delta\mathrm{ E_k}"),
+            (r"\mathrm{W = Q + \Delta_1 E_k}", r"\mathrm{W = Q + \Delta_1 E_k}"),
+            (r"F_{\mathrm{\text{合}}}", r"F_{\mathrm{\text{合}}}"),
+            (r"\mathrm { V } , 6 \mathrm { W } ^ { ' ' } .", r"\mathrm{ V } , 6 \mathrm{ W } '' ."),
+            (r"t_{1}^{'}+t_{2}^{'}", r"t_{1}^{'}+t_{2}^{'}"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                once = sanitize_math_for_xelatex(raw)
+                self.assertEqual(once, expected)
+                self.assertEqual(sanitize_math_for_xelatex(once), expected)
+        spec = {'questions': [{'body': [{'type': 'math', 'value': 'v_{皮}'}],
+                               'choices': [[{'type': 'math', 'value': r"6\mathrm{W}^{''}"}]],
+                               'answer': {'body': [{'type': 'math', 'value': r'\mathrm{W+\Delta E}'}]}}]}
+        sanitize_spec_for_xelatex(spec)
+        self.assertEqual(spec['questions'][0]['body'][0]['value'], r'v_{\text{皮}}')
+        self.assertEqual(spec['questions'][0]['choices'][0][0]['value'], r"6\mathrm{W}''")
+        self.assertEqual(spec['questions'][0]['answer']['body'][0]['value'], r'\mathrm{W+}\Delta\mathrm{ E}')
 
 
 if __name__=='__main__':unittest.main()
