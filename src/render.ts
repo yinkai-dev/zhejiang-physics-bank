@@ -1,4 +1,4 @@
-import type {Block,Question,Paper} from './types';
+import type {AiReference,Block,Question,Paper} from './types';
 import {url} from './data';
 export function el<K extends keyof HTMLElementTagNameMap>(tag:K,cls='',text?:string):HTMLElementTagNameMap[K] {
   const node=document.createElement(tag); if(cls)node.className=cls; if(text!==undefined)node.textContent=text; return node;
@@ -70,5 +70,15 @@ export function answerContent(q:Question) {
   const body=el('div','answer-body tex-ignore');
   if(q.answer.status!=='source') body.append(el('p','muted',statusLabel[q.answer.status]+'。后续补充来源答案。'));
   else {if(q.answer.key)body.append(el('p','answer-key','参考答案：'+q.answer.key));blocks(body,q.answer.body);if(!q.answer.body.length)body.append(el('p','muted small','来源仅提供答案，未附解题过程。'));}
+  return body;
+}
+
+export function aiReferenceContent(ref:AiReference) {
+  const body = el('div', 'answer-body tex-ignore');
+  body.append(el('p', 'muted small', ref.label));
+  if (ref.key) body.append(el('p', 'answer-key', `AI 参考选项 ${ref.key}`));
+  if (ref.condition) body.append(el('p', 'answer-key', `${ref.condition.text}时选 ${ref.condition.key}`));
+  if (ref.note) body.append(el('p', 'notice', ref.note));
+  blocks(body, ref.body);
   return body;
 }

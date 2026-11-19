@@ -3,7 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 
-ALLOWED_BANKS = frozenset({'zj-25-erkao', 'zj-26-erkao', 'zj-26-shoukao', 'zj-27-shoukao'})
+ALLOWED_BANKS = frozenset({'zj-25-erkao', 'zj-25-shoukao', 'zj-26-erkao', 'zj-26-shoukao', 'zj-27-shoukao'})
 MAX_QUESTIONS = 50
 
 

@@ -4,7 +4,7 @@
    字号 12/14/16/18/20/24/30/36/48；配色来自 design/design-tokens.json。 */
 import './style.css';
 import {getCatalog,getIndex,getPaper,url} from './data';
-import {el,link,button,dateLabel,statusLabel,content,answerContent,typeset,clearMath} from './render';
+import {el,link,button,dateLabel,statusLabel,content,answerContent,aiReferenceContent,typeset,clearMath} from './render';
 import {filterKeys,parseFilters,filterQuestions,addSelection,moveSelection,selectionIssues} from './domain.mjs';
 import type {Catalog,Paper,Question,Summary,Selection} from './types';
 import {pdfControls} from './pdf';
@@ -46,7 +46,7 @@ const main=shell();
 function crumb(items:{text:string;href?:string}[]) {const n=el('nav','breadcrumbs no-print');n.setAttribute('aria-label','当前位置');items.forEach((x,i)=>{if(i)n.append(el('span','','/'));n.append(x.href?link(x.text,x.href):el('span','',x.text));});return n;}
 function alertBox(message:string,cls='notice') {const n=el('div',cls,message);n.setAttribute('role','status');return n;}
 function heading(kicker:string,title:string,description?:string) {const h=el('div','page-heading');h.append(el('p','eyebrow',kicker),el('h1','',title));if(description)h.append(el('p','intro',description));return h;}
-function paperMeta(p:Paper) {const m=el('div','metadata');m.append(el('span','badge',`${p.original_classification}备考`),el('span','',dateLabel(p)),el('span','','备考卷'));return m;}
+function paperMeta(p:Paper) {const m=el('div','metadata');m.append(el('span','badge',`${p.original_classification}备考`),el('span','',dateLabel(p)),el('span','',p.exam_kind==='official'?'正式真题':'备考卷'));return m;}
 function questionCard(q:Question,p:Paper,options:{answer?:boolean;number?:number}={}) {
   const card=el('article','question-card');card.dataset.questionId=q.id;
   const top=el('div','question-top'),label=el('div','question-label');label.append(el('span','question-number',options.number===undefined?`第 ${q.number} 题`:`${options.number}.`),el('span','question-type',q.type),el('span','muted small',q.topics.join(' · ')));
@@ -54,6 +54,12 @@ function questionCard(q:Question,p:Paper,options:{answer?:boolean;number?:number
   const source=el('p','question-source',`${p.title} · 原第 ${q.number} 题 · ${p.original_classification}备考 · 实际 ${dateLabel(p)}`);
   card.append(top,source,content(q));
   if(options.answer!==false) {const d=el('details','answer-details');const summary=el('summary','',q.answer.status==='source'?'查看原卷答案':statusLabel[q.answer.status]);d.append(summary,answerContent(q));d.addEventListener('toggle',()=>{if(d.open)typeset(d).catch(e=>toast(e.message));});card.append(d);}
+  if (options.answer!==false && q.ai_reference) {
+    const details = el('details', 'answer-details');
+    details.append(el('summary', '', '查看 AI 参考答案'), aiReferenceContent(q.ai_reference));
+    details.addEventListener('toggle', () => { if (details.open) typeset(details).catch(e => toast(e.message)); });
+    card.append(details);
+  }
   return card;
 }
 

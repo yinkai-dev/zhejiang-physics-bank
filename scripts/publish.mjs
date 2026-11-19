@@ -32,7 +32,7 @@ const DATA_PATHS = ['public/data', 'public/images', 'metadata/paper-catalog.json
 const BUNDLE_FILES = ['pdf-service/app.py', 'pdf-service/contract.py', 'pdf-service/compile_job.py', 'pdf-service/test_service.py', 'pdf-service/requirements.txt', 'pdf-service/README.md', 'pdf-service/zjpdf.service', 'pdf-service/deploy_remote.py', 'public/data/catalog.json', 'public/data/questions-index.json'];
 
 const [command = 'status', ...rest] = process.argv.slice(2);
-const args = parseArgs(rest, { flags: ['dry-run', 'verify', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle', 'paper-meta'] });
+const args = parseArgs(rest, { flags: ['dry-run', 'verify', 'skip-sync', 'allow-change', 'server', 'json'], values: ['scope', 'message', 'bundle', 'paper-meta', 'ai-references'] });
 const local = loadConfig();
 const config = { ...DEFAULTS, ...local, remote: { ...DEFAULTS.remote, ...(local.remote || {}) } };
 const dryRun = !!args['dry-run'];
@@ -291,7 +291,11 @@ async function run() {
     });
     if (dryRun && synced.changed) say('  ⚠ 题库有新 release，dry-run 不改本机文件；以下计划基于当前已导出的投影，正式运行会先同步并重新导出。');
   }
-  if (!dryRun) await step('导出公开投影', () => lastJson(runNode('scripts/export-bank.mjs', args['allow-change'] ? ['--allow-change'] : [], { capture: true })));
+  if (!dryRun) await step('导出公开投影', () => {
+    const exportArgs = args['allow-change'] ? ['--allow-change'] : [];
+    if (args['ai-references']) exportArgs.push('--ai-references', path.resolve(args['ai-references']));
+    return lastJson(runNode('scripts/export-bank.mjs', exportArgs, { capture: true }));
+  });
   if (dryRun && !args.verify) say('  本次仅预览发布计划。正式发布会执行数据、公式、接口和构建校验。');
   else await step('校验与构建', () => {
     runNode('scripts/check-public.mjs', [], { capture: true });

@@ -205,7 +205,7 @@ def action_install(cfg, args):
         verified = verify_release(target)
         drop_staging(cfg, args['blob']['id'])
         return {'installed': False, 'already_present': True, 'questions': len(verified.store.questions)}
-    need(target.parent.is_dir(), 'bank is not installed on this server: ' + bank)
+    need(Path(cfg['banks_root']).is_dir(), 'bank root is not installed')
     blob = read_blob(cfg, args['blob'])
     have = existing_index(cfg, bank, skip=release)
     work = target.parent / ('.incoming-%s-%d' % (release, os.getpid()))

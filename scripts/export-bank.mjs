@@ -7,13 +7,15 @@
 // on disk, published questions may only be added or gain a source answer; removals or content
 // changes abort unless --allow-change is given after the owner has confirmed them.
 import fs from 'node:fs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import { readJson, readLines, sha, canonical, pick, confined, parseArgs } from './lib/common.mjs';
 import { diffPublic, describeDiff, diffSummary, loadPublicDir } from './lib/diff.mjs';
 import { awaitingFirstRelease } from './lib/paper-meta.mjs';
 import { verifySnapshot } from './lib/snapshot.mjs';
+import { validateReference } from './lib/ai-reference.mjs';
 
-const args = parseArgs(process.argv.slice(2), { flags: ['allow-change', 'verify-history'] });
+const args = parseArgs(process.argv.slice(2), { flags: ['allow-change', 'verify-history'], values: ['ai-references'] });
 const write = (p, v) => { fs.mkdirSync(p.slice(0, p.lastIndexOf('/')), { recursive: true }); fs.writeFileSync(p, JSON.stringify(v) + '\n'); };
 const pointers = readJson('.local/banks/active.json');
 const report = readJson('.local/import-report.json');
@@ -31,6 +33,28 @@ const index = [], assets = new Map(), details = new Map(papers.map(p => [p.paper
 const answerCounts = {source:0, missing:0, not_ingested:0};
 const perCollection = Object.fromEntries(catalog.collections.map(c => [c.collection_id, {questions:0, source:0, missing:0, not_ingested:0}]));
 const blockCounts = {};
+const previous = loadPublicDir('public');
+const priorReferences = new Map(previous.catalog.papers.flatMap(p =>
+  (previous.paper(p.paper_id) || []).filter(q => q.ai_reference).map(q => [q.id, q.ai_reference])));
+const incoming = args['ai-references'] ? readJson(args['ai-references']) : {};
+const usedReferences = {};
+
+function attachReference(q) {
+  const fresh = Object.hasOwn(incoming, q.id);
+  const ref = fresh ? incoming[q.id] : priorReferences.get(q.id);
+  if (!ref) return q;
+  validateReference(ref, q);
+  for (const block of ref.body) {
+    if (block.type !== 'figure') continue;
+    assert(/^images\/[a-f0-9]{64}\.png$/.test(block.src));
+    const base = fresh ? path.dirname(path.resolve(args['ai-references'])) : 'public';
+    const data = fs.readFileSync(confined(base, block.src));
+    assert.equal(sha(data), block.src.slice(7, -4), 'AI reference image digest mismatch');
+    assets.set(block.src, data);
+  }
+  usedReferences[q.id] = ref;
+  return {...q, ai_reference:ref};
+}
 
 function projectBlocks(blocks, assetMap, base, qid) {
   assert(Array.isArray(blocks));
@@ -100,7 +124,7 @@ for (const [collection, release] of Object.entries(active)) {
     assert(tag.topics.length && tag.topics.every(t => ['力学','电学','光学','热学','近代物理'].includes(t)));
     const summary = {id,paper_id:paperId,source_question_id:q.question_id,number:q.original_question_number,order:q.order,type,topics:tag.topics,answer_status:status,fingerprint:fp,search_text:q.retrieval_text};
     index.push(summary);
-    details.get(paperId).push({...pick(summary,['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint']),body:projectBlocks(q.body,qassets,pkg,q.question_id),choices:q.choices.map(c => projectBlocks(c,qassets,pkg,q.question_id)),answer:{status,key:a?.key || null,body:a ? projectBlocks(a.body,aassets,answerBase,q.question_id) : []}});
+    details.get(paperId).push(attachReference({...pick(summary,['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint']),body:projectBlocks(q.body,qassets,pkg,q.question_id),choices:q.choices.map(c => projectBlocks(c,qassets,pkg,q.question_id)),answer:{status,key:a?.key || null,body:a ? projectBlocks(a.body,aassets,answerBase,q.question_id) : []}}));
   }
 }
 // Acceptance contract derived from the data itself: catalog metadata, releases and projection agree.
@@ -118,9 +142,11 @@ for (const p of papers) {
   // Compare the actual source number set; no positional question-type inference.
   assert.equal(new Set(qs.map(q=>q.number)).size,qs.length);
 }
-const version = sha(canonical({papers,index,source_releases:active}));
+assert(Object.keys(incoming).every(id => Object.hasOwn(usedReferences, id)), 'AI reference has no current question match');
+const version = sha(canonical({papers,index,source_releases:active,
+  ...(Object.keys(usedReferences).length ? {ai_references:usedReferences} : {})}));
 // Regression guard against the projection currently on disk (normally the last published one).
-const diff = diffPublic(loadPublicDir('public'), {catalog:{papers,version},index,paper:id=>details.get(id)||null});
+const diff = diffPublic(previous, {catalog:{papers,version},index,paper:id=>details.get(id)||null});
 for (const line of describeDiff(diff)) console.error(line);
 assert(!diff.blocking || args['allow-change'], 'Published questions would be removed or changed. Stop and confirm with the owner; then re-run with --allow-change.');
 // Explicit generated output directories only. Stale files are removed only when changes were allowed.

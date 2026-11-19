@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readJson} from './lib/common.mjs';
+import {validateReference} from './lib/ai-reference.mjs';
 const root=process.argv[2]||'public';
 const read=p=>readJson(`${root}/${p}`);
 const catalog=read('data/catalog.json'),index=read('data/questions-index.json');
@@ -16,7 +17,7 @@ assert.equal(new Set(index.questions.map(q=>q.id)).size,index.questions.length);
 assert.equal(index.questions.length,catalog.papers.reduce((s,p)=>s+p.question_count,0),'Index size differs from catalog paper totals');
 assert.deepEqual(Object.keys(catalog.source_releases).sort(),catalog.collections.map(c=>c.collection_id).sort());
 const allowedIndex=['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint','search_text'];
-const allowedQuestion=allowedIndex.filter(k=>k!=='search_text').concat(['body','choices','answer']);
+const allowedQuestion=allowedIndex.filter(k=>k!=='search_text').concat(['body','choices','answer','ai_reference']);
 const safeKeys=(v,keys)=>assert(Object.keys(v).every(k=>keys.includes(k)), 'Unexpected public field '+Object.keys(v).filter(k=>!keys.includes(k)));
 const counts={source:0,missing:0,not_ingested:0},images=new Set(),ids=new Set();
 const perCollection=Object.fromEntries(catalog.collections.map(c=>[c.collection_id,{papers:0,questions:0,source:0,missing:0,not_ingested:0}]));
@@ -28,6 +29,14 @@ function walk(blocks) {assert(Array.isArray(blocks));for(const b of blocks){
 }}
 for(const p of catalog.papers){const d=read(`data/papers/${p.paper_id}.json`);assert.equal(d.paper_id,p.paper_id);assert.equal(d.questions.length,p.question_count);const expected=index.questions.filter(q=>q.paper_id===p.paper_id);assert.deepEqual(d.questions.map(q=>q.id).sort(),expected.map(q=>q.id).sort());const c=perCollection[p.collection_id];assert(c,'Paper outside public collections '+p.paper_id);c.papers++;let source=0;for(const q of d.questions){safeKeys(q,allowedQuestion);const s=expected.find(s=>s.id===q.id);safeKeys(s,allowedIndex);for(const k of allowedIndex.filter(k=>k!=='search_text'))assert.deepEqual(q[k],s[k]);assert(!ids.has(q.id));ids.add(q.id);safeKeys(q.answer,['status','key','body']);assert.equal(q.answer.status,q.answer_status);counts[q.answer_status]++;c.questions++;c[q.answer_status]++;if(q.answer_status==='source')source++;walk(q.body);q.choices.forEach(walk);walk(q.answer.body);assert(q.answer.status==='source'||(!q.answer.key&&!q.answer.body.length));}assert.equal(source,p.source_answer_count,'Paper answer count '+p.paper_id);}
 for(const c of catalog.collections){const a=perCollection[c.collection_id];assert.deepEqual([a.papers,a.questions,a.source,a.missing,a.not_ingested],[c.paper_count,c.question_count,c.source_answer_count,c.explicitly_missing_answer_count,c.answer_not_ingested_count],'Collection totals '+c.collection_id);}
+for (const p of catalog.papers) {
+  for (const q of read(`data/papers/${p.paper_id}.json`).questions) {
+    if (q.ai_reference) {
+      validateReference(q.ai_reference, q);
+      walk(q.ai_reference.body);
+    }
+  }
+}
 assert.deepEqual(fs.readdirSync(`${root}/images`).map(f=>'images/'+f).sort(),[...images].sort());
 assert.deepEqual(fs.readdirSync(`${root}/data`).sort(),['catalog.json','papers','questions-index.json']);
 assert.deepEqual(fs.readdirSync(`${root}/data/papers`).sort(),catalog.papers.map(p=>p.paper_id+'.json').sort());
