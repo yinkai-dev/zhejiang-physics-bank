@@ -53,6 +53,11 @@ export function verifyReleaseTree(releaseDir, expectedSumsSha) {
 
 export const validPointer = p => p && /^rel-[a-f0-9]+$/.test(p.release_id) && /^[a-f0-9]{64}$/.test(p.release_sums_sha256);
 
+// 识别历史无答案基线（base.answers === null）在增量扩充时生成的未入库传承占位行，以保持已发布旧题 answer_status 零变化。
+export const LEGACY_NOT_INGESTED_PREFIX = 'legacy_not_ingested：';
+export const isLegacyNotIngested = a => Boolean(a && a.status === 'missing' && typeof a.missing_reason === 'string' && a.missing_reason.startsWith(LEGACY_NOT_INGESTED_PREFIX));
+export const effectiveAnswerStatus = a => (!a || isLegacyNotIngested(a)) ? 'not_ingested' : a.status;
+
 // Minimal `--flag value` / `--flag` parser. Repeated flags collect into arrays when listed in `multi`.
 export function parseArgs(argv, { flags = [], values = [], multi = [] } = {}) {
   const out = { _: [] };

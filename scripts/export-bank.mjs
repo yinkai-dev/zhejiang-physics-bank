@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { readJson, readLines, sha, canonical, pick, confined, parseArgs } from './lib/common.mjs';
+import { readJson, readLines, sha, canonical, pick, confined, effectiveAnswerStatus, parseArgs } from './lib/common.mjs';
 import { diffPublic, describeDiff, diffSummary, loadPublicDir } from './lib/diff.mjs';
 import { awaitingFirstRelease } from './lib/paper-meta.mjs';
 import { verifySnapshot } from './lib/snapshot.mjs';
@@ -117,14 +117,14 @@ for (const [collection, release] of Object.entries(active)) {
       assert.equal(a.original_question_number, q.original_question_number);
       assert(['source','missing'].includes(a.status));
     }
-    const status = a?.status || 'not_ingested';
+    const status = effectiveAnswerStatus(a);
     answerCounts[status]++; perCollection[collection][status]++; perCollection[collection].questions++;
     const type = tag.question_type === '选择题' ? (tag.choice_mode === 'multiple' ? '多选题' : '单选题') : tag.question_type;
     assert(['单选题','多选题','实验题','计算题'].includes(type));
     assert(tag.topics.length && tag.topics.every(t => ['力学','电学','光学','热学','近代物理'].includes(t)));
     const summary = {id,paper_id:paperId,source_question_id:q.question_id,number:q.original_question_number,order:q.order,type,topics:tag.topics,answer_status:status,fingerprint:fp,search_text:q.retrieval_text};
     index.push(summary);
-    details.get(paperId).push(attachReference({...pick(summary,['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint']),body:projectBlocks(q.body,qassets,pkg,q.question_id),choices:q.choices.map(c => projectBlocks(c,qassets,pkg,q.question_id)),answer:{status,key:a?.key || null,body:a ? projectBlocks(a.body,aassets,answerBase,q.question_id) : []}}));
+    details.get(paperId).push(attachReference({...pick(summary,['id','paper_id','source_question_id','number','order','type','topics','answer_status','fingerprint']),body:projectBlocks(q.body,qassets,pkg,q.question_id),choices:q.choices.map(c => projectBlocks(c,qassets,pkg,q.question_id)),answer:{status,key:status==='source'?(a?.key||null):null,body:status==='source'&&a?projectBlocks(a.body,aassets,answerBase,q.question_id):[]}}));
   }
 }
 // Acceptance contract derived from the data itself: catalog metadata, releases and projection agree.

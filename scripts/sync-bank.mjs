@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { readJson, readLines, writeJson, verifyReleaseTree, validPointer, parseArgs, loadConfig, sha } from './lib/common.mjs';
+import { readJson, readLines, writeJson, verifyReleaseTree, validPointer, effectiveAnswerStatus, parseArgs, loadConfig, sha } from './lib/common.mjs';
 import { awaitingFirstRelease, buildNewPaper } from './lib/paper-meta.mjs';
 
 const args = parseArgs(process.argv.slice(2), { flags: ['dry-run', 'allow-removal'], values: ['source', 'root', 'paper-meta'], multi: ['bank'] });
@@ -100,12 +100,13 @@ for (const bankId of banks) {
   const answers = answerId ? readLines(path.join(sourceRelease, 'answers', answerId, 'answers.jsonl')) : [];
   const before = JSON.stringify([collection, catalog.papers.filter(p => p.collection_id === bankId)]);
   delete collection.pending_first_release;
+  const statuses = answers.map(effectiveAnswerStatus);
   Object.assign(collection, {
     paper_count: pkg.documents.length, question_count: questions.length,
     question_image_count: release.components.question_package.required_asset_count,
-    source_answer_count: answers.filter(a => a.status === 'source').length,
-    explicitly_missing_answer_count: answers.filter(a => a.status === 'missing').length,
-    answer_not_ingested_count: questions.length - answers.length,
+    source_answer_count: statuses.filter(s => s === 'source').length,
+    explicitly_missing_answer_count: statuses.filter(s => s === 'missing').length,
+    answer_not_ingested_count: (questions.length - answers.length) + statuses.filter(s => s === 'not_ingested').length,
   });
   const byId = new Map(catalog.papers.map(p => [p.paper_id, p]));
   const seen = new Set(), addedPapers = [];
