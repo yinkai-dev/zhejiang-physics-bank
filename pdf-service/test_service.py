@@ -8,8 +8,9 @@ import unittest
 
 from starlette.testclient import TestClient
 from app import create_app
-from compile_job import sanitize_math_for_xelatex, sanitize_spec_for_xelatex
+from compile_job import _raise_package_capacity as raise_compile_capacity, sanitize_math_for_xelatex, sanitize_spec_for_xelatex
 from contract import PublicCatalog, RequestError
+from deploy_remote import _raise_package_capacity as raise_deploy_capacity
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT/'public'/'data'
@@ -151,6 +152,21 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(spec['questions'][0]['body'][0]['value'], r'v_{\text{皮}}')
         self.assertEqual(spec['questions'][0]['choices'][0][0]['value'], r"6\mathrm{W}''")
         self.assertEqual(spec['questions'][0]['answer']['body'][0]['value'], r'\mathrm{W+}\Delta\mathrm{ E}')
+
+    def test_raise_package_capacity_preserves_image_bounds(self):
+        class DummyPackage:
+            MAX_PACKAGE_BYTES = 64 * 1024 * 1024
+            MAX_FILE_BYTES = 10 * 1024 * 1024
+            MAX_IMAGE_BYTES = 8 * 1024 * 1024
+            MAX_RECORDS = 5000
+
+        for fn in (raise_compile_capacity, raise_deploy_capacity):
+            dummy = DummyPackage()
+            fn(dummy)
+            self.assertEqual(dummy.MAX_PACKAGE_BYTES, 256 * 1024 * 1024)
+            self.assertEqual(dummy.MAX_FILE_BYTES, 32 * 1024 * 1024)
+            self.assertEqual(dummy.MAX_IMAGE_BYTES, 8 * 1024 * 1024)
+            self.assertEqual(dummy.MAX_RECORDS, 20_000)
 
 
 if __name__=='__main__':unittest.main()

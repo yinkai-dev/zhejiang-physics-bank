@@ -191,11 +191,20 @@ def action_probe(cfg, args):
     return result
 
 
+def _raise_package_capacity(bank_package):
+    """在不修改远端共享虚拟环境源码的前提下，为 30+ 卷大集合放宽整包容量上限。"""
+    bank_package.MAX_PACKAGE_BYTES = max(bank_package.MAX_PACKAGE_BYTES, 256 * 1024 * 1024)
+    bank_package.MAX_FILE_BYTES = max(bank_package.MAX_FILE_BYTES, 32 * 1024 * 1024)
+    bank_package.MAX_RECORDS = max(bank_package.MAX_RECORDS, 20_000)
+
+
 def action_install(cfg, args):
     """Install one bank release next to the existing ones. The MCP pointer file is not touched."""
     from physics_worksheet_mcp import __version__
+    from physics_worksheet_mcp.bank import package as bank_package
     from physics_worksheet_mcp.bank.release import verify_release
     need(__version__ == cfg.get('engine_version', '0.1.2'), 'renderer version mismatch: ' + __version__)
+    _raise_package_capacity(bank_package)
     bank, release, sums_sha = args['bank'], args['release_id'], args['release_sums_sha256']
     need(HEX64.match(sums_sha), 'invalid checksum')
     target = release_dir(cfg, bank, release)

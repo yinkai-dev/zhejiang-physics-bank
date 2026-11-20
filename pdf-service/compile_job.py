@@ -182,9 +182,17 @@ def _patch_renderer(renderer, safety):
     renderer._structured_tex = _safe_structured
 
 
+def _raise_package_capacity(bank_package):
+    """在不修改远端冻结 0.1.2 环境源码的前提下，为大题库集合放宽整包容量上限。"""
+    bank_package.MAX_PACKAGE_BYTES = max(bank_package.MAX_PACKAGE_BYTES, 256 * 1024 * 1024)
+    bank_package.MAX_FILE_BYTES = max(bank_package.MAX_FILE_BYTES, 32 * 1024 * 1024)
+    bank_package.MAX_RECORDS = max(bank_package.MAX_RECORDS, 20_000)
+
+
 def compile_job(directory, banks):
     # The deployment pins the installed upstream renderer, imported read-only.
     from physics_worksheet_mcp import __version__
+    from physics_worksheet_mcp.bank import package as bank_package
     from physics_worksheet_mcp.bank.release import BankRegistry
     from physics_worksheet_mcp.catalog.service import Catalog
     from physics_worksheet_mcp.resolve.service import resolve_selection
@@ -193,6 +201,7 @@ def compile_job(directory, banks):
     import pymupdf
     if __version__ != '0.1.2':
         raise ValueError('Renderer version mismatch')
+    _raise_package_capacity(bank_package)
     _patch_renderer(renderer, safety)
     out = Path(directory).resolve()
     request = json.loads((out/'request.json').read_text(encoding='utf8'))
