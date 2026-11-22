@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "snapshot_date": "2026-11-20",
+  "snapshot_date": "2026-11-22",
   "collections": [
     {
       "collection_id": "zj-25-erkao",
@@ -31,11 +31,11 @@
       "label": "2026 二考",
       "target_year": 2026,
       "target_session": "second",
-      "paper_count": 26,
-      "question_count": 468,
-      "question_image_count": 771,
+      "paper_count": 25,
+      "question_count": 450,
+      "question_image_count": 744,
       "source_answer_count": 445,
-      "explicitly_missing_answer_count": 23,
+      "explicitly_missing_answer_count": 5,
       "answer_not_ingested_count": 0
     },
     {
@@ -60,6 +60,18 @@
       "question_image_count": 991,
       "source_answer_count": 618,
       "explicitly_missing_answer_count": 16,
+      "answer_not_ingested_count": 0
+    },
+    {
+      "collection_id": "zj-zhenti",
+      "label": "历年选考真题",
+      "target_year": null,
+      "target_session": null,
+      "paper_count": 2,
+      "question_count": 37,
+      "question_image_count": 46,
+      "source_answer_count": 19,
+      "explicitly_missing_answer_count": 18,
       "answer_not_ingested_count": 0
     }
   ],
@@ -1505,24 +1517,6 @@
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
-      "paper_id": "zj-26-erkao--paper-0f58a917fecae1c2",
-      "collection_id": "zj-26-erkao",
-      "source_document_id": "paper-0f58a917fecae1c2",
-      "title": "2026年6月浙江物理选考真题",
-      "target_year": 2026,
-      "target_session": "second",
-      "exam_year": 2026,
-      "exam_month": 6,
-      "exam_date": null,
-      "date_basis": "source_paper_header",
-      "exam_kind": "official",
-      "official_session": "second",
-      "original_classification": "2026 二考",
-      "question_count": 18,
-      "source_answer_count": 0,
-      "metadata_review_status": "official_source_verified"
-    },
-    {
       "paper_id": "zj-25-shoukao--paper-281c952e2dc7d42f",
       "collection_id": "zj-25-shoukao",
       "source_document_id": "paper-281c952e2dc7d42f",
@@ -2493,6 +2487,42 @@
       "question_count": 20,
       "source_answer_count": 20,
       "metadata_review_status": "classification_preserved_date_inferred"
+    },
+    {
+      "paper_id": "zj-zhenti--paper-0f58a917fecae1c2",
+      "collection_id": "zj-zhenti",
+      "source_document_id": "paper-0f58a917fecae1c2",
+      "title": "2026年6月浙江物理选考真题",
+      "target_year": null,
+      "target_session": null,
+      "exam_year": 2026,
+      "exam_month": 6,
+      "exam_date": null,
+      "date_basis": "source_paper_header",
+      "exam_kind": "official",
+      "official_session": "second",
+      "original_classification": "历年选考真题",
+      "question_count": 18,
+      "source_answer_count": 0,
+      "metadata_review_status": "official_source_verified"
+    },
+    {
+      "paper_id": "zj-zhenti--zhenti-zj-202506",
+      "collection_id": "zj-zhenti",
+      "source_document_id": "zhenti-zj-202506",
+      "title": "2025年6月浙江物理选考真题",
+      "target_year": null,
+      "target_session": null,
+      "exam_year": 2025,
+      "exam_month": 6,
+      "exam_date": null,
+      "date_basis": "source_paper_header",
+      "exam_kind": "official",
+      "official_session": "second",
+      "original_classification": "历年选考真题",
+      "question_count": 19,
+      "source_answer_count": 19,
+      "metadata_review_status": "official_source_verified"
     }
   ]
 }
