@@ -8,7 +8,7 @@ import unittest
 
 from starlette.testclient import TestClient
 from app import create_app
-from compile_job import _raise_package_capacity as raise_compile_capacity, sanitize_math_for_xelatex, sanitize_spec_for_xelatex
+from compile_job import _patch_renderer, _raise_package_capacity as raise_compile_capacity, sanitize_math_for_xelatex, sanitize_spec_for_xelatex
 from contract import PublicCatalog, RequestError
 from deploy_remote import _raise_package_capacity as raise_deploy_capacity
 
@@ -167,6 +167,19 @@ class ServiceTests(unittest.TestCase):
             self.assertEqual(dummy.MAX_FILE_BYTES, 32 * 1024 * 1024)
             self.assertEqual(dummy.MAX_IMAGE_BYTES, 8 * 1024 * 1024)
             self.assertEqual(dummy.MAX_RECORDS, 20_000)
+
+    def test_patch_renderer_maps_ratio_and_sum_glyphs(self):
+        class DummyRenderer:
+            @staticmethod
+            def _structured_tex(*args):
+                return ""
+        class DummySafety:
+            _UNICODE_MATH = {}
+            _TEXT_ESCAPES = {}
+        _patch_renderer(DummyRenderer, DummySafety)
+        self.assertEqual(DummySafety._TEXT_ESCAPES.get('∶'), ':')
+        self.assertEqual(DummySafety._UNICODE_MATH.get('∑'), r'\sum')
+        self.assertEqual(DummySafety._UNICODE_MATH.get('•'), r'\cdot')
 
 
 if __name__=='__main__':unittest.main()

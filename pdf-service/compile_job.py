@@ -165,6 +165,7 @@ def _patch_renderer(renderer, safety):
     safety._UNICODE_MATH.setdefault('∑', r'\sum')
     safety._UNICODE_MATH.setdefault('•', r'\cdot')
     safety._UNICODE_MATH.setdefault('⊂', r'\subset')
+    safety._TEXT_ESCAPES.setdefault('∶', ':')
     if getattr(renderer._structured_tex, '_zjpdf_patched', False):
         return
     orig_structured = renderer._structured_tex
