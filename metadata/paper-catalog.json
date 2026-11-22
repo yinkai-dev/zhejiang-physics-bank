@@ -10,9 +10,9 @@
       "paper_count": 27,
       "question_count": 486,
       "question_image_count": 798,
-      "source_answer_count": 288,
+      "source_answer_count": 486,
       "explicitly_missing_answer_count": 0,
-      "answer_not_ingested_count": 198
+      "answer_not_ingested_count": 0
     },
     {
       "collection_id": "zj-26-shoukao",
@@ -91,7 +91,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -109,7 +109,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -127,7 +127,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -145,7 +145,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -163,7 +163,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -181,7 +181,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -199,7 +199,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -217,7 +217,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -235,7 +235,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -253,7 +253,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
@@ -271,7 +271,7 @@
       "official_session": null,
       "original_classification": "2025 二考",
       "question_count": 18,
-      "source_answer_count": 0,
+      "source_answer_count": 18,
       "metadata_review_status": "classification_preserved_date_inferred"
     },
     {
