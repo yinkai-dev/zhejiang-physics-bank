@@ -283,6 +283,7 @@ async function run() {
     assert(config.source_banks, '缺少 source_banks：在 .local/publish-config.json 中配置，或加 --skip-sync');
     const synced = await step(dryRun ? '同步题库快照（预演）' : '同步题库快照', () => {
       const syncArgs = dryRun ? ['--dry-run'] : [];
+      if (args['allow-change']) syncArgs.push('--allow-removal');
       const metaPath = args['paper-meta'] || config.paper_meta;
       if (metaPath) syncArgs.push('--paper-meta', path.resolve(metaPath));
       const s = lastJson(runNode('scripts/sync-bank.mjs', syncArgs, { capture: true }));

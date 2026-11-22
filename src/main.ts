@@ -46,14 +46,25 @@ const main=shell();
 function crumb(items:{text:string;href?:string}[]) {const n=el('nav','breadcrumbs no-print');n.setAttribute('aria-label','当前位置');items.forEach((x,i)=>{if(i)n.append(el('span','','/'));n.append(x.href?link(x.text,x.href):el('span','',x.text));});return n;}
 function alertBox(message:string,cls='notice') {const n=el('div',cls,message);n.setAttribute('role','status');return n;}
 function heading(kicker:string,title:string,description?:string) {const h=el('div','page-heading');h.append(el('p','eyebrow',kicker),el('h1','',title));if(description)h.append(el('p','intro',description));return h;}
-function paperMeta(p:Paper) {const m=el('div','metadata');m.append(el('span','badge',`${p.original_classification}备考`),el('span','',dateLabel(p)),el('span','',p.exam_kind==='official'?'正式真题':'备考卷'));return m;}
+function paperClassLabel(p:Paper) {
+  if(p.exam_kind==='official') {
+    const s=p.official_session==='first'?'首考':p.official_session==='second'?'二考':'';
+    return p.exam_year?`${p.exam_year} ${s}真题`:'历年真题';
+  }
+  return `${p.original_classification}备考`;
+}
+function officialSessionLabel(p:Paper) {
+  const s=p.official_session==='first'?'首考':p.official_session==='second'?'二考':'统考';
+  return `${p.exam_year??''} ${s}${p.exam_month?`（${p.exam_month}月）`:''}`.trim();
+}
+function paperMeta(p:Paper) {const m=el('div','metadata');m.append(el('span','badge',paperClassLabel(p)),el('span','',dateLabel(p)),el('span','',p.exam_kind==='official'?'正式真题':'备考卷'));return m;}
 function questionCard(q:Question,p:Paper,options:{answer?:boolean;number?:number}={}) {
   const card=el('article','question-card');card.dataset.questionId=q.id;
   const top=el('div','question-top'),label=el('div','question-label');label.append(el('span','question-number',options.number===undefined?`第 ${q.number} 题`:`${options.number}.`),el('span','question-type',q.type),el('span','muted small',q.topics.join(' · ')));
   const actions=el('div','question-actions no-print');actions.append(link('单题链接',`question.html?id=${encodeURIComponent(q.id)}`),selectButton(q));top.append(label,actions);
-  const source=el('p','question-source',`${p.title} · 原第 ${q.number} 题 · ${p.original_classification}备考 · 实际 ${dateLabel(p)}`);
+  const source=el('p','question-source',`${p.title} · 原第 ${q.number} 题 · ${paperClassLabel(p)} · 实际 ${dateLabel(p)}`);
   card.append(top,source,content(q));
-  if(options.answer!==false) {const d=el('details','answer-details');const summary=el('summary','',q.answer.status==='source'?'查看原卷答案':statusLabel[q.answer.status]);d.append(summary,answerContent(q));d.addEventListener('toggle',()=>{if(d.open)typeset(d).catch(e=>toast(e.message));});card.append(d);}
+  if(options.answer!==false) {const d=el('details','answer-details');const summary=el('summary','',q.answer.status==='source'?(q.answer.body.length?'查看答案与详解':'查看原卷答案'):statusLabel[q.answer.status]);d.append(summary,answerContent(q));d.addEventListener('toggle',()=>{if(d.open)typeset(d).catch(e=>toast(e.message));});card.append(d);}
   if (options.answer!==false && q.ai_reference) {
     const details = el('details', 'answer-details');
     details.append(el('summary', '', '查看 AI 参考答案'), aiReferenceContent(q.ai_reference));
@@ -64,9 +75,23 @@ function questionCard(q:Question,p:Paper,options:{answer?:boolean;number?:number
 }
 
 async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper>) {
-  main.append(heading('ZHEJIANG · PHYSICS','从一道原题，开始今天的练习。','按备考届别找试卷，按主题选原题。已有原卷答案随题查看，选好的题目可以生成 PDF。'));
+  main.append(heading('ZHEJIANG · PHYSICS','从一道原题，开始今天的练习。','按历年选考真题或备考届别找试卷，按主题选原题。已有答案与详解随题查看，选好的题目可以生成 PDF。'));
+  const officialCollections=catalog.collections.filter(c=>c.target_year===null);
+  officialCollections.forEach(c=>{
+    const box=el('section','official-bank-card'),head=el('div','official-bank-head');
+    const titleWrap=el('div');titleWrap.append(el('p','eyebrow','OFFICIAL EXAMS · 历年真题题库'),el('strong','collection-year',c.label));
+    const rightWrap=el('div','official-bank-meta');rightWrap.append(el('span','muted small',`${c.paper_count} 卷 · ${c.question_count} 题`),link('筛选全部真题 →',`index.html?collection=${encodeURIComponent(c.collection_id)}`,'button small-button'));
+    head.append(titleWrap,rightWrap);box.append(head);
+    const examPapers=catalog.papers.filter(p=>p.collection_id===c.collection_id).sort((a,b)=>((b.exam_year||0)*100+(b.exam_month||0))-((a.exam_year||0)*100+(a.exam_month||0)));
+    if(examPapers.length){
+      const pills=el('div','official-session-pills');
+      examPapers.forEach(p=>pills.append(link(officialSessionLabel(p),`paper.html?id=${encodeURIComponent(p.paper_id)}`,'session-pill')));
+      box.append(pills);
+    }
+    main.append(box);
+  });
   const collections=el('div','collection-grid');
-  [...catalog.collections].sort((a,b)=>b.target_year-a.target_year).forEach(c=>{const a=link('',`index.html?year=${c.target_year}&session=${c.target_session}`,'collection-card');a.append(el('span','eyebrow',c.target_session==='first'?'首考备考':'二考备考'),el('strong','collection-year',String(c.target_year)),el('span','',`${c.paper_count} 卷 · ${c.question_count} 题`),el('span','card-arrow','↗'));collections.append(a);});main.append(collections);
+  [...catalog.collections].filter(c=>c.target_year!==null).sort((a,b)=>(b.target_year||0)-(a.target_year||0)).forEach(c=>{const a=link('',`index.html?year=${c.target_year}&session=${c.target_session}`,'collection-card');a.append(el('span','eyebrow',c.target_session==='first'?'首考备考':'二考备考'),el('strong','collection-year',String(c.target_year)),el('span','',`${c.paper_count} 卷 · ${c.question_count} 题`),el('span','card-arrow','↗'));collections.append(a);});main.append(collections);
   const sourceAnswers=index.filter(q=>q.answer_status==='source').length,officialPapers=catalog.papers.filter(p=>p.exam_kind==='official').length;
   const info=el('p','catalog-note',`已收录 ${catalog.papers.length} 卷 · ${index.length} 道原题 · ${sourceAnswers} 题有来源答案。${officialPapers?`其中正式真题 ${officialPapers} 卷，其余为备考卷。`:'当前均为模拟、联考或诊断等备考卷。'}`);main.append(info);
   const layout=el('div','catalog-layout'),filterPanel=el('details','filters no-print');filterPanel.open=matchMedia('(min-width: 760px)').matches;
@@ -74,16 +99,17 @@ async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper
   const form=el('form','filter-form');form.setAttribute('aria-label','题库筛选');
   const reset=button('清除全部筛选',()=>{for(const key of filterKeys)params.delete(key);params.delete('q');params.delete('page');history.pushState(null,'',url('index.html')+(params.size?'?'+params:''));location.reload();},'text-button');
   const groups:{key:string;label:string;options:[string,string][];advanced?:boolean}[]=[
-    {key:'year',label:'备考年份',options:[...new Set(catalog.papers.map(p=>p.target_year))].sort((a,b)=>b-a).map(y=>[String(y),String(y)])},
-    {key:'session',label:'备考阶段',options:[['first','首考'],['second','二考']]},
+    ...(officialCollections.length?[{key:'collection',label:'题库集合',options:catalog.collections.map(c=>[c.collection_id,c.label] as [string,string])}]:[]),
+    {key:'kind',label:'试卷性质',options:[['official','正式真题'],['practice','备考卷']]},
+    {key:'year',label:'备考年份',options:[...new Set(catalog.papers.map(p=>p.target_year).filter((y):y is number=>y!==null))].sort((a,b)=>b-a).map(y=>[String(y),String(y)])},
+    {key:'session',label:'阶段／场次',options:[['first','首考'],['second','二考']]},
     {key:'topic',label:'主题',options:['力学','电学','光学','热学','近代物理'].map(t=>[t,t])},
     {key:'type',label:'题型',options:['单选题','多选题','实验题','计算题'].map(t=>[t,t])},
     {key:'answer',label:'答案状态',options:[['source','已有原卷答案'],['missing','原卷答案缺失'],['not_ingested','答案尚未入库']]},
-    {key:'kind',label:'试卷性质',options:[['practice','备考卷'],['official','正式真题']],advanced:true},
-    {key:'examYear',label:'实际考试年份',options:[...new Set(catalog.papers.map(p=>p.exam_year))].sort().map(y=>[y===null?'unknown':String(y),y===null?'未知':String(y)]),advanced:true},
+    {key:'examYear',label:'实际考试年份',options:[...new Set(catalog.papers.map(p=>p.exam_year))].sort((a,b)=>(b||0)-(a||0)).map(y=>[y===null?'unknown':String(y),y===null?'未知':String(y)]),advanced:true},
     {key:'month',label:'实际考试月份',options:[...new Set(catalog.papers.map(p=>p.exam_month))].sort((a,b)=>(a||0)-(b||0)).map(m=>[m===null?'unknown':String(m),m===null?'未知':`${m} 月`]),advanced:true}
   ];
-  const advanced=el('details','advanced-filters');advanced.open=['examYear','kind','month'].some(k=>params.has(k));advanced.append(el('summary','','更多筛选'));
+  const advanced=el('details','advanced-filters');advanced.open=['examYear','month'].some(k=>params.has(k));advanced.append(el('summary','','更多筛选'));
   for(const g of groups) {
     const field=el('fieldset','filter-group');field.append(el('legend','',g.label));
     const opts=g.options.slice();for(const v of parseFilters(params)[g.key])if(!opts.some(o=>o[0]===v))opts.push([v,v]);
@@ -102,7 +128,7 @@ async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper
   function renderResults() {
     const filters=parseFilters(params),matched=filterQuestions(index,papers,filters,params.get('q')||'');
     const grouped=new Map<string,Summary[]>();matched.forEach(q=>grouped.set(q.paper_id,[...(grouped.get(q.paper_id)||[]),q]));
-    const compare=(a:Paper,b:Paper)=>sort.value==='title'?a.title.localeCompare(b.title,'zh-CN'):((a.exam_year||0)*100+(a.exam_month||0)-(b.exam_year||0)*100-(b.exam_month||0))*(sort.value==='oldest'?1:-1)||b.target_year-a.target_year||a.title.localeCompare(b.title,'zh-CN');
+    const compare=(a:Paper,b:Paper)=>sort.value==='title'?a.title.localeCompare(b.title,'zh-CN'):((a.exam_year||0)*100+(a.exam_month||0)-(b.exam_year||0)*100-(b.exam_month||0))*(sort.value==='oldest'?1:-1)||(b.target_year||0)-(a.target_year||0)||a.title.localeCompare(b.title,'zh-CN');
     const sortedPapers=[...grouped.keys()].map(id=>papers.get(id)!).sort(compare);
     matched.sort((a,b)=>compare(papers.get(a.paper_id)!,papers.get(b.paper_id)!)||a.order-b.order);
     count.replaceChildren(el('strong','',`${matched.length} 道题`),el('span','muted',` / ${grouped.size} 张试卷`));count.setAttribute('role','status');
@@ -111,7 +137,7 @@ async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper
     list.replaceChildren();pagination.replaceChildren();
     if(!matched.length){const empty=el('div','empty-state');empty.append(el('div','empty-symbol','∅'),el('h2','','没有符合条件的题目'),el('p','muted','试着减少筛选条件或更换关键词。当前条件已保留。'),button('清除全部筛选',()=>reset.click(),'button'));list.append(empty);return;}
     const isQuestions=view.value==='questions',size=isQuestions?20:10,total=isQuestions?matched.length:sortedPapers.length,totalPages=Math.ceil(total/size),current=Math.min(totalPages,Math.max(1,Number(params.get('page'))||1)),start=(current-1)*size;
-    if(isQuestions) matched.slice(start,start+size).forEach(q=>{const p=papers.get(q.paper_id)!,card=el('article','question-result');const top=el('div','result-card-top');top.append(el('span','badge',q.type),el('span','muted small',q.topics.join(' · ')),selectButton(q));card.append(top,link(`${p.title} · 第 ${q.number} 题`,`question.html?id=${encodeURIComponent(q.id)}`,'result-title'),el('p','question-preview',q.search_text.slice(0,170)+(q.search_text.length>170?'…':'')),el('div','muted small',`${p.original_classification}备考 · 实际 ${dateLabel(p)} · ${statusLabel[q.answer_status]}`));list.append(card);});
+    if(isQuestions) matched.slice(start,start+size).forEach(q=>{const p=papers.get(q.paper_id)!,card=el('article','question-result');const top=el('div','result-card-top');top.append(el('span','badge',q.type),el('span','muted small',q.topics.join(' · ')),selectButton(q));card.append(top,link(`${p.title} · 第 ${q.number} 题`,`question.html?id=${encodeURIComponent(q.id)}`,'result-title'),el('p','question-preview',q.search_text.slice(0,170)+(q.search_text.length>170?'…':'')),el('div','muted small',`${paperClassLabel(p)} · 实际 ${dateLabel(p)} · ${statusLabel[q.answer_status]}`));list.append(card);});
     else sortedPapers.slice(start,start+size).forEach(p=>{const qs=grouped.get(p.paper_id)!,card=el('article','paper-result');const content=el('div','paper-result-content');content.append(paperMeta(p),link(p.title,`paper.html?id=${encodeURIComponent(p.paper_id)}`,'result-title'),el('p','muted small',`${qs.length} 题符合筛选 · 全卷 ${p.question_count} 题 · ${p.source_answer_count} 题有来源答案`));const action=link('浏览试卷 →',`paper.html?id=${encodeURIComponent(p.paper_id)}`,'paper-open');card.append(content,action);list.append(card);});
     if(totalPages>1){if(current>1)pagination.append(button('← 上一页',()=>goPage(current-1),'button'));pagination.append(el('span','muted',`第 ${current} / ${totalPages} 页`));if(current<totalPages)pagination.append(button('下一页 →',()=>goPage(current+1),'button'));}
     save();
@@ -125,8 +151,8 @@ async function indexPage(catalog:Catalog,index:Summary[],papers:Map<string,Paper
 
 async function paperPage(catalog:Catalog,papers:Map<string,Paper>) {
   const p=papers.get(params.get('id')||'');if(!p)throw Error('没有找到这张试卷，请从题库目录重新选择。');
-  document.title=p.title+' · 浙江物理题库';main.append(crumb([{text:'题库',href:'index.html'},{text:p.original_classification},{text:p.title}]),heading('原卷浏览',p.title),paperMeta(p));
-  main.append(el('p','muted date-note','实际考试年月由原卷标题推得，精确到月；“'+p.original_classification+'”是备考分类。'));
+  document.title=p.title+' · 浙江物理题库';main.append(crumb([{text:'题库',href:'index.html'},{text:p.original_classification,href:p.exam_kind==='official'?`index.html?collection=${encodeURIComponent(p.collection_id)}`:undefined},{text:p.title}]),heading('原卷浏览',p.title),paperMeta(p));
+  main.append(el('p','muted date-note',p.exam_kind==='official'?`正式选考真题 · 所属题库：${p.original_classification}。`:'实际考试年月由原卷标题推得，精确到月；“'+p.original_classification+'”是备考分类。'));
   const qs=await getPaper(p.paper_id),actions=el('div','paper-actions no-print');
   actions.append(button('整卷加入练习 ＋',()=>{qs.forEach(q=>selected=addSelection(selected,q));save();toast(`已将本卷 ${qs.length} 题加入练习，重复题自动去重。`);}),link('查看练习并打印 →','worksheet.html','button primary'));
   main.append(actions);
@@ -137,7 +163,7 @@ async function singlePage(index:Summary[],papers:Map<string,Paper>) {
   const s=index.find(q=>q.id===params.get('id'));if(!s)throw Error('没有找到这道题，请从题库目录重新选择。');
   const p=papers.get(s.paper_id)!,qs=await getPaper(p.paper_id),q=qs.find(q=>q.id===s.id)!;
   document.title=`${p.title} 第 ${q.number} 题 · 浙江物理题库`;
-  main.classList.add('reading-page');main.append(crumb([{text:'题库',href:'index.html'},{text:p.title,href:`paper.html?id=${encodeURIComponent(p.paper_id)}`},{text:`第 ${q.number} 题`}]),heading(p.original_classification+'备考',`第 ${q.number} 题 · ${q.type}`),paperMeta(p),questionCard(q,p));
+  main.classList.add('reading-page');main.append(crumb([{text:'题库',href:'index.html'},{text:p.title,href:`paper.html?id=${encodeURIComponent(p.paper_id)}`},{text:`第 ${q.number} 题`}]),heading(paperClassLabel(p),`第 ${q.number} 题 · ${q.type}`),paperMeta(p),questionCard(q,p));
   const nav=el('nav','question-pagination no-print');nav.setAttribute('aria-label','切换题目');const pos=qs.findIndex(x=>x.id===q.id);
   if(pos>0)nav.append(link('← 上一题',`question.html?id=${encodeURIComponent(qs[pos-1].id)}`,'button'));
   nav.append(link('返回整卷',`paper.html?id=${encodeURIComponent(p.paper_id)}#q-${q.number}`,'button'));
@@ -178,7 +204,7 @@ function aboutPage(catalog:Catalog) {
   main.classList.add('reading-page');main.append(heading('关于题库','让整理好的原题，方便地被使用。','面向浙江物理选考备考的公开静态题库。'));
   const section=el('article','prose');section.innerHTML=`<h2>目前收录</h2><p data-about="collected"></p><h2>年份与答案</h2><p>“2027 首考”表示备考目标，卷面实际考试可能在 2026 年。实际年月从原卷标题推得，并非逐卷重新确认的完整考试日期。</p><p data-about="answers"></p><h2>使用方法</h2><p>组合年份、阶段、主题和题型筛选，或搜索试卷名与题目关键词。筛选取交集，同一维度多选取并集。题目加入“我的练习”后可调序、移除，再点击“生成 PDF”取得排版好的练习卷，并可同时生成独立的原卷答案 PDF。也保留浏览器打印。单题和筛选链接可以直接分享。</p><p>练习清单仅保存在当前浏览器，不跨设备同步。PDF 每次最多 50 题，文件保留 24 小时，请及时下载；持有文件链接的人可以访问。使用浏览器打印时请等待“已就绪”，推荐 A4 并关闭页眉页脚。长题可跨页。</p><h2>来源与状态</h2><p>题目文字、公式、题图、答案来自已整理的原卷内容，保留原卷标题与题号。主题和题型沿用来源 AI 分类，尚未经过教师逐题复核。工程校验只验证关联、转换和展示，不等于教师审核或教学效果证明。</p><p>网站代码、题目内容和第三方依赖分别管理。题目及原卷图片的权利属于相应权利人，本站的整理与公开展示不授予内容再许可。</p><h2>勘误与反馈</h2><p>如发现缺图、题文或答案问题，请附上单题链接和原卷题号；涉及内容权利的问题也可通过仓库反馈。</p>`;
   // Totals come from the published catalog, so new papers need no copy edit here.
-  const groups=[...catalog.collections].sort((a,b)=>a.target_year-b.target_year||a.label.localeCompare(b.label)),sum=(f:(c:Catalog['collections'][number])=>number)=>groups.reduce((s,c)=>s+f(c),0);
+  const groups=[...catalog.collections].sort((a,b)=>(a.target_year??-1)-(b.target_year??-1)||a.label.localeCompare(b.label)),sum=(f:(c:Catalog['collections'][number])=>number)=>groups.reduce((s,c)=>s+f(c),0);
   const official=catalog.papers.filter(p=>p.exam_kind==='official').length;
   section.querySelector('[data-about="collected"]')!.textContent=`${groups.map(c=>`${c.label} ${c.paper_count} 卷 ${c.question_count} 题`).join('、')}，共 ${sum(c=>c.paper_count)} 卷 ${sum(c=>c.question_count)} 题。${official?`其中正式真题 ${official} 卷，其余为模拟、联考、诊断等备考卷。`:'当前全部为模拟、联考、诊断等备考卷，尚未收录正式高考真题。'}`;
   const gaps=[...groups.filter(c=>c.explicitly_missing_answer_count).map(c=>`${c.label}有 ${c.explicitly_missing_answer_count} 题明确缺失原卷答案`),...groups.filter(c=>c.answer_not_ingested_count).map(c=>`${c.label} ${c.answer_not_ingested_count} 题尚未接入答案包`)];

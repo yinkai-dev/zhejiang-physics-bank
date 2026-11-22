@@ -14,10 +14,12 @@ export function awaitingFirstRelease(collection, papers) {
 export function buildNewPaper(collection, doc, questionCount, sourceAnswers, paperMeta = {}) {
   const paperId = `${collection.collection_id}--${doc.document_id}`;
   const override = paperMeta[paperId] || paperMeta[doc.document_id] || {};
-  const kind = override.exam_kind || 'practice';
+  const isOfficialCollection = collection.target_year === null;
+  const kind = override.exam_kind || (isOfficialCollection ? 'official' : 'practice');
   assert(['practice', 'official'].includes(kind), `Invalid exam_kind "${kind}" for ${paperId}`);
+  assert(!isOfficialCollection || kind === 'official', `Official collection "${collection.collection_id}" only accepts official papers: ${paperId}`);
 
-  if (!override.exam_kind && LIKELY_OFFICIAL_TITLE.test(doc.title)) {
+  if (!override.exam_kind && !isOfficialCollection && LIKELY_OFFICIAL_TITLE.test(doc.title)) {
     assert.fail(
       `Title "${doc.title}" looks like an official exam, which must not silently default to practice. ` +
       `Provide --paper-meta with {"${paperId}":{"exam_kind":"official","official_session":"first|second","exam_year":…,"exam_month":…,"date_basis":"…"}}`
@@ -51,8 +53,8 @@ export function buildNewPaper(collection, doc, questionCount, sourceAnswers, pap
     collection_id: collection.collection_id,
     source_document_id: doc.document_id,
     title: doc.title,
-    target_year: collection.target_year,
-    target_session: collection.target_session,
+    target_year: collection.target_year ?? null,
+    target_session: collection.target_session ?? null,
     exam_year: null,
     exam_month: null,
     exam_date: null,

@@ -51,6 +51,40 @@ test('official exam merges into target preparation collection and never silently
   assert.equal(official.metadata_review_status, 'official_source_verified');
 });
 
+test('dedicated official exam collection defaults exam_kind to official with null target_year', () => {
+  const zhenti = {
+    collection_id: 'zj-zhenti',
+    label: '历年选考真题',
+    target_year: null,
+    target_session: null,
+  };
+  assert.throws(
+    () => buildNewPaper(zhenti, { document_id: 'zj-202506', title: '2025年6月浙江物理选考真题' }, 19, 19, {}),
+    /requires explicit official_session/
+  );
+  assert.throws(
+    () => buildNewPaper(zhenti, { document_id: 'mock-2506', title: '物理卷-2506模拟' }, 18, 18, {
+      'zj-zhenti--mock-2506': { exam_kind: 'practice' },
+    }),
+    /only accepts official papers/
+  );
+  const p = buildNewPaper(zhenti, { document_id: 'zj-202506', title: '2025年6月浙江物理选考真题' }, 19, 19, {
+    'zj-zhenti--zj-202506': {
+      official_session: 'second',
+      exam_year: 2025,
+      exam_month: 6,
+      date_basis: 'source_paper_header',
+    },
+  });
+  assert.equal(p.collection_id, 'zj-zhenti');
+  assert.equal(p.target_year, null);
+  assert.equal(p.target_session, null);
+  assert.equal(p.exam_kind, 'official');
+  assert.equal(p.official_session, 'second');
+  assert.equal(p.exam_year, 2025);
+  assert.equal(p.exam_month, 6);
+});
+
 test('only an explicitly empty new collection can await its first release', () => {
   const pending = { ...shoukao, pending_first_release: true, paper_count: 0, question_count: 0 };
   assert.equal(awaitingFirstRelease(pending, []), true);

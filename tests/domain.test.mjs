@@ -10,26 +10,31 @@ const filter=query=>filterQuestions(index,papers,parseFilters(new URLSearchParam
 // that the filter walks), so the suite keeps holding when papers are added.
 const sumCollections=(pick,keep=()=>true)=>catalog.collections.filter(keep).reduce((s,c)=>s+pick(c),0);
 const sumPapers=keep=>catalog.papers.filter(keep).reduce((s,p)=>s+p.question_count,0);
-const years=[...new Set(catalog.collections.map(c=>c.target_year))].sort();
+const prepCollections=catalog.collections.filter(c=>c.target_year!==null);
+const years=[...new Set(prepCollections.map(c=>c.target_year))].sort();
 test('every bank is present and target year stays separate from actual exam year',()=>{
   assert.equal(filter('').length,sumCollections(c=>c.question_count));
+  for(const c of catalog.collections)assert.equal(filter('collection='+c.collection_id).length,c.question_count);
   for(const y of years)assert.equal(filter('year='+y).length,sumCollections(c=>c.question_count,c=>c.target_year===y));
-  for(const c of catalog.collections)assert.equal(filter(`year=${c.target_year}&session=${c.target_session}`).length,sumCollections(x=>x.question_count,x=>x.target_year===c.target_year&&x.target_session===c.target_session));
+  for(const c of prepCollections)assert.equal(filter(`year=${c.target_year}&session=${c.target_session}`).length,sumCollections(x=>x.question_count,x=>x.target_year===c.target_year&&x.target_session===c.target_session));
   const examYears=[...new Set(catalog.papers.map(p=>p.exam_year))].filter(y=>y!==null);
   for(const y of examYears)assert.equal(filter('examYear='+y).length,sumPapers(p=>p.exam_year===y));
   // A preparation target year with no paper actually sat in that year must not match by exam year.
   for(const y of years.filter(y=>!examYears.includes(y)))assert.equal(filter('examYear='+y).length,0);
-  const prepared=catalog.papers.find(p=>p.exam_year!==null&&p.exam_year!==p.target_year);
+  const prepared=catalog.papers.find(p=>p.target_year!==null&&p.exam_year!==null&&p.exam_year!==p.target_year);
   if(prepared)assert.equal(filter(`year=${prepared.target_year}&examYear=${prepared.exam_year}`).length,sumPapers(p=>p.target_year===prepared.target_year&&p.exam_year===prepared.exam_year));
   assert.equal(filter('kind=official').length,sumPapers(p=>p.exam_kind==='official'));
   assert.equal(filter('kind=practice').length,sumPapers(p=>p.exam_kind==='practice'));
+  for(const p of catalog.papers.filter(p=>p.exam_kind==='official'&&p.official_session&&p.exam_year!==null)){
+    assert.equal(filter(`kind=official&examYear=${p.exam_year}&session=${p.official_session}`).length,sumPapers(x=>x.exam_kind==='official'&&x.exam_year===p.exam_year&&x.official_session===p.official_session));
+  }
 });
 test('same dimension union, cross dimension intersection, unique topics',()=>{
   const [first,last]=[years[0],years.at(-1)];
   assert.equal(filter(`year=${first}&year=${last}`).length,sumCollections(c=>c.question_count,c=>[first,last].includes(c.target_year)));
-  for(const s of new Set(catalog.collections.map(c=>c.target_session)))assert.equal(filter('session='+s).length,sumCollections(c=>c.question_count,c=>c.target_session===s));
+  for(const s of new Set(prepCollections.map(c=>c.target_session)))assert.equal(filter('session='+s).length,sumPapers(p=>(p.target_session||p.official_session)===s));
   const qs=filter('topic=光学&topic=近代物理');assert.equal(qs.length,new Set(qs.map(q=>q.id)).size);
-  const year=catalog.collections[0].target_year,intersection=filter(`topic=光学&type=实验题&year=${year}`);
+  const year=prepCollections[0].target_year,intersection=filter(`topic=光学&type=实验题&year=${year}`);
   assert(intersection.every(q=>q.topics.includes('光学')&&q.type==='实验题'&&papers.get(q.paper_id).target_year===year));
 });
 test('answer states and keyword matching use actual data',()=>{
@@ -37,7 +42,7 @@ test('answer states and keyword matching use actual data',()=>{
   assert.equal(filter('answer=missing').length,sumCollections(c=>c.explicitly_missing_answer_count));
   assert.equal(filter('answer=not_ingested').length,sumCollections(c=>c.answer_not_ingested_count));
   // Keyword search covers the paper title: every question of a paper is found by a title fragment.
-  const paper=catalog.papers.at(-1),fragment=paper.title.slice(-4),hits=filter(`q=${encodeURIComponent(fragment)}&year=${paper.target_year}`);
+  const paper=catalog.papers.at(-1),fragment=paper.title.slice(-4),hits=filter(`q=${encodeURIComponent(fragment)}&collection=${paper.collection_id}`);
   assert(hits.length>=paper.question_count);
   assert.equal(hits.filter(q=>q.paper_id===paper.paper_id).length,paper.question_count);
   assert(hits.every(q=>(papers.get(q.paper_id).title+' '+q.search_text+' '+q.topics.join(' ')+' '+q.type).toLocaleLowerCase().includes(fragment.toLocaleLowerCase())));

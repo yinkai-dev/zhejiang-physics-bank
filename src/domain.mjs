@@ -1,4 +1,4 @@
-export const filterKeys = ['year','session','kind','type','topic','answer','examYear','month'];
+export const filterKeys = ['collection','year','session','kind','type','topic','answer','examYear','month'];
 export function parseFilters(params) {
   return Object.fromEntries(filterKeys.map(k=>[k, params.getAll(k).flatMap(v=>v.split(',')).filter(Boolean)]));
 }
@@ -6,7 +6,7 @@ export function filterQuestions(questions, paperMap, filters, search='') {
   const tokens = search.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
   return questions.filter(q=>{
     const p = paperMap.get(q.paper_id);
-    const values = {year:[String(p.target_year)],session:[p.target_session],kind:[p.exam_kind],type:[q.type],topic:q.topics,answer:[q.answer_status],examYear:[p.exam_year === null ? 'unknown' : String(p.exam_year)],month:[p.exam_month === null ? 'unknown' : String(p.exam_month)]};
+    const values = {collection:[p.collection_id],year:p.target_year===null?[]:[String(p.target_year)],session:[p.target_session||p.official_session].filter(Boolean),kind:[p.exam_kind],type:[q.type],topic:q.topics,answer:[q.answer_status],examYear:[p.exam_year === null ? 'unknown' : String(p.exam_year)],month:[p.exam_month === null ? 'unknown' : String(p.exam_month)]};
     return filterKeys.every(k=>!filters[k]?.length || filters[k].some(v=>values[k].includes(v))) && tokens.every(t=>(p.title+' '+q.search_text+' '+q.topics.join(' ')+' '+q.type).toLocaleLowerCase().includes(t));
   });
 }

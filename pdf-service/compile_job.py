@@ -162,6 +162,9 @@ def _patch_renderer(renderer, safety):
     """为冻结 0.1.2 渲染器补充缺字字符映射，并避免带图选项触发图片顺序错位的 sideall 布局。"""
     safety._UNICODE_MATH.setdefault('★', r'\bigstar')
     safety._UNICODE_MATH.setdefault('☆', r'\star')
+    safety._UNICODE_MATH.setdefault('∑', r'\sum')
+    safety._UNICODE_MATH.setdefault('•', r'\cdot')
+    safety._UNICODE_MATH.setdefault('⊂', r'\subset')
     if getattr(renderer._structured_tex, '_zjpdf_patched', False):
         return
     orig_structured = renderer._structured_tex
